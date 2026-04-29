@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Source = 'inscrits' | 'non_inscrits' | 'thematique'
+type Source = 'inscrits' | 'non_inscrits' | 'thematique' | 'prospects_chauds'
 
 interface TopCliqueurApiResponse {
   contacts: EnrichedTopClicker[]
@@ -39,6 +39,22 @@ interface CreateResult {
   listName?: string
   count?: number
   error?: string
+}
+
+// Miroir local du retour de /api/contacts/by-theme
+interface HotProspect {
+  email: string
+  contactId: string
+  totalClicks: number
+  clicksOnTheme: number
+  lastClickOnTheme: string
+}
+
+interface HotProspectsApiResponse {
+  theme: string
+  minClicks: number
+  count: number
+  prospects: HotProspect[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -110,6 +126,12 @@ export default function ListesPage() {
   const [creating, setCreating] = useState(false)
   const [createResult, setCreateResult] = useState<CreateResult | null>(null)
 
+  // ── Prospects chauds state (mode prospects_chauds, URL-driven) ─────────────
+  const [prospectsTheme, setProspectsTheme] = useState('')
+  const [prospectsData, setProspectsData] = useState<HotProspect[] | null>(null)
+  const [prospectsLoading, setProspectsLoading] = useState(false)
+  const [prospectsError, setProspectsError] = useState('')
+
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // ── Fetch top cliqueurs + campaigns ────────────────────────────────────────
@@ -157,12 +179,21 @@ export default function ListesPage() {
     }
   }, [])
 
-  // ── Lire les params URL (source= et theme= envoyés depuis top-cliqueurs) ───
+  // ── Lire les params URL ────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const s = params.get('source')
     const t = params.get('theme')
+
+    // Mode prospects_chauds — early return pour ne pas polluer filterTheme
+    if (s === 'prospects_chauds' && t) {
+      setSource('prospects_chauds')
+      setProspectsTheme(t)
+      setListName(`Prospects chauds — ${t}`)
+      return
+    }
+
     if (s === 'inscrits' || s === 'non_inscrits' || s === 'thematique') {
       setSource(s)
     }
@@ -174,15 +205,44 @@ export default function ListesPage() {
     fetchExistingLists()
   }, [fetchInitialData, fetchExistingLists])
 
-  // Reset theme states when source changes
+  // Reset states when source changes — preserve prospects_chauds context
   useEffect(() => {
+    setCreateResult(null)
+    if (source === 'prospects_chauds') return
     if (source !== 'thematique') setSelectedTheme('')
     if (source === 'thematique') setFilterTheme('')
-    setCreateResult(null)
   }, [source])
+
+  // ── Fetch prospects chauds quand on entre dans le mode ────────────────────
+  useEffect(() => {
+    if (source !== 'prospects_chauds' || !prospectsTheme) return
+    let cancelled = false
+    const load = async () => {
+      setProspectsLoading(true)
+      setProspectsError('')
+      try {
+        const res = await fetch(`/api/contacts/by-theme?theme=${encodeURIComponent(prospectsTheme)}`)
+        const json = await res.json()
+        if (!res.ok) {
+          throw new Error((json as { error?: string })?.error ?? `Erreur ${res.status}`)
+        }
+        if (!cancelled) setProspectsData((json as HotProspectsApiResponse).prospects ?? [])
+      } catch (err) {
+        if (!cancelled) setProspectsError(err instanceof Error ? err.message : 'Erreur inconnue')
+      } finally {
+        if (!cancelled) setProspectsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [source, prospectsTheme])
 
   // ── Compute emails for selected source ─────────────────────────────────────
   const contactEmails: string[] = (() => {
+    if (source === 'prospects_chauds') {
+      return prospectsData?.map((p) => p.email) ?? []
+    }
+
     if (!topData) return []
 
     if (source === 'inscrits' || source === 'non_inscrits') {
@@ -221,19 +281,28 @@ export default function ListesPage() {
   async function handleCreate() {
     if (!listName.trim() || creating) return
     if (source === 'thematique' && !selectedTheme) return
+    if (source === 'prospects_chauds' && (!prospectsTheme || contactCount === 0)) return
 
     setCreating(true)
     setCreateResult(null)
 
     try {
-      const theme = source === 'thematique' ? selectedTheme : filterTheme || undefined
+      // L'API valide source ∈ {inscrits, non_inscrits, thematique} ; on map
+      // prospects_chauds → 'thematique' pour passer la validation. La valeur
+      // n'est utilisée que par la validation côté API, pas dans la création.
+      const apiSource = source === 'prospects_chauds' ? 'thematique' : source
+      const theme =
+        source === 'prospects_chauds' ? prospectsTheme :
+        source === 'thematique' ? selectedTheme :
+        filterTheme || undefined
+
       const res = await fetch('/api/hubspot/listes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: listName.trim(),
           contactEmails,
-          source,
+          source: apiSource,
           ...(theme ? { theme } : {}),
         }),
       })
@@ -257,8 +326,16 @@ export default function ListesPage() {
   const canSubmit =
     listName.trim() !== '' &&
     !creating &&
-    !loadingData &&
-    (source !== 'thematique' || selectedTheme !== '')
+    (
+      source === 'prospects_chauds'
+        ? !prospectsLoading && contactCount > 0
+        : !loadingData && (source !== 'thematique' || selectedTheme !== '')
+    )
+
+  const showPreview =
+    source === 'prospects_chauds'
+      ? !prospectsLoading
+      : !loadingData && (source !== 'thematique' || selectedTheme)
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -313,9 +390,12 @@ export default function ListesPage() {
             <div className="flex items-center gap-2 flex-wrap">
               {(
                 [
-                  { value: 'inscrits', label: 'Top cliqueurs inscrits' },
+                  { value: 'inscrits',     label: 'Top cliqueurs inscrits' },
                   { value: 'non_inscrits', label: 'Top cliqueurs non inscrits' },
-                  { value: 'thematique', label: 'Thématique' },
+                  { value: 'thematique',   label: 'Thématique' },
+                  ...(prospectsTheme
+                    ? [{ value: 'prospects_chauds' as Source, label: 'Prospects chauds' }]
+                    : []),
                 ] as { value: Source; label: string }[]
               ).map(({ value, label }) => (
                 <button
@@ -397,8 +477,70 @@ export default function ListesPage() {
             </div>
           )}
 
+          {/* Mode prospects_chauds : tableau preview */}
+          {source === 'prospects_chauds' && (
+            <div>
+              <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
+                Aperçu des prospects chauds — {prospectsTheme}
+              </label>
+
+              {prospectsError && (
+                <div className="mb-3"><ErrorBanner message={prospectsError} /></div>
+              )}
+
+              <div className="border border-[#e5e5e5] rounded-[4px] overflow-hidden max-h-[360px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[#fafafa] sticky top-0">
+                    <tr className="border-b border-[#e5e5e5]">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                        Email
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                        Clics sur le thème
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                        Dernier clic
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prospectsLoading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i} className="border-b border-[#f5f5f5] last:border-0">
+                          <td className="px-4 py-2.5">
+                            <div className="h-4 w-48 bg-[#f5f5f5] rounded animate-pulse" />
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="h-4 w-8 bg-[#f5f5f5] rounded animate-pulse ml-auto" />
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="h-4 w-20 bg-[#f5f5f5] rounded animate-pulse" />
+                          </td>
+                        </tr>
+                      ))
+                    ) : (prospectsData?.length ?? 0) === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
+                          Aucun prospect chaud sur ce thème.
+                        </td>
+                      </tr>
+                    ) : (
+                      prospectsData!.map((p) => (
+                        <tr key={p.email} className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors">
+                          <td className="px-4 py-2.5 text-[#0a0a0a]">{p.email}</td>
+                          <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
+                          <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Preview nom HubSpot + contacts count */}
-          {!loadingData && (source !== 'thematique' || selectedTheme) && (
+          {showPreview && (
             <div className="space-y-1">
               {listName.trim() && (
                 <p className="text-xs text-[#737373]">

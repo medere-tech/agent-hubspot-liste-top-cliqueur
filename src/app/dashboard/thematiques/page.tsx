@@ -169,7 +169,7 @@ export default function ThematiquesPage() {
   }
 
   function goToListe(themeName: string) {
-    router.push(`/dashboard/listes?source=thematique&theme=${encodeURIComponent(themeName)}`)
+    router.push(`/dashboard/listes?source=prospects_chauds&theme=${encodeURIComponent(themeName)}`)
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
