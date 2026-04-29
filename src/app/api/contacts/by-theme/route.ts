@@ -76,10 +76,16 @@ const getCachedHotProspects = unstable_cache(
     }
 
     prospects.sort((a, b) => b.clicksOnTheme - a.clicksOnTheme)
+    console.log('[by-theme]', {
+      theme,
+      minClicks,
+      allRowsCount: allRows.length,
+      prospectsCount: prospects.length,
+    })
     return prospects
   },
   ['contacts-by-theme'],
-  { revalidate: 300, tags: ['hubspot'] }
+  { revalidate: 60, tags: ['hubspot'] }
 )
 
 export async function GET(req: NextRequest) {

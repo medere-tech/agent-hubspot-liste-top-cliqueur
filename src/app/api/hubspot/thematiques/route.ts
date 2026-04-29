@@ -109,7 +109,7 @@ const getCachedThemes = unstable_cache(
     return aggregates
   },
   ['hubspot-thematiques'],
-  { revalidate: 300, tags: ['hubspot'] }
+  { revalidate: 60, tags: ['hubspot'] }
 )
 
 export async function GET(_req: NextRequest) {

@@ -214,7 +214,7 @@ export default function DashboardPage() {
             <button
               key={value}
               onClick={() => setPeriod(value)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
                 period === value
                   ? 'bg-[#0a0a0a] text-white'
                   : 'bg-white text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a]'
@@ -270,7 +270,7 @@ export default function DashboardPage() {
             <button
               key={value}
               onClick={() => setTypeFilter(value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-[4px] border transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-[4px] border transition-colors cursor-pointer ${
                 typeFilter === value
                   ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                   : 'bg-white text-[#737373] border-[#e5e5e5] hover:border-[#0a0a0a] hover:text-[#0a0a0a]'
@@ -308,7 +308,7 @@ export default function DashboardPage() {
         {hasFilters && (
           <button
             onClick={resetFilters}
-            className="flex items-center gap-1 text-xs text-[#737373] hover:text-[#0a0a0a] transition-colors ml-auto"
+            className="flex items-center gap-1 text-xs text-[#737373] hover:text-[#0a0a0a] transition-colors cursor-pointer ml-auto"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
               <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -417,7 +417,7 @@ export default function DashboardPage() {
               disabled={!hasPrev}
               className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                 hasPrev
-                  ? 'text-[#0a0a0a] hover:text-[#737373]'
+                  ? 'text-[#0a0a0a] hover:text-[#737373] cursor-pointer'
                   : 'text-[#d4d4d4] cursor-not-allowed'
               }`}
             >
@@ -439,7 +439,7 @@ export default function DashboardPage() {
                   <button
                     key={size}
                     onClick={() => setPageSize(size)}
-                    className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                    className={`px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
                       pageSize === size
                         ? 'bg-[#0a0a0a] text-white'
                         : 'bg-white text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a]'
@@ -457,7 +457,7 @@ export default function DashboardPage() {
               disabled={!hasNext}
               className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                 hasNext
-                  ? 'text-[#0a0a0a] hover:text-[#737373]'
+                  ? 'text-[#0a0a0a] hover:text-[#737373] cursor-pointer'
                   : 'text-[#d4d4d4] cursor-not-allowed'
               }`}
             >

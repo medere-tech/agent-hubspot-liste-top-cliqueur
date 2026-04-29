@@ -226,15 +226,34 @@ export async function POST(req: NextRequest) {
     // 2. Create the list — prefix "[Agent] " added automatically
     const prefixedName = `[Agent] ${name.trim()}`
     const created = await createHubSpotList(prefixedName, token)
-    const { list } = created
+    console.log('[create-list raw]', JSON.stringify(created, null, 2))
+
+    // Defensive listId extraction — handle wrapped { list: {...} } or flat shapes,
+    // and listId vs id field name variants.
+    const createdObj = created as unknown as Record<string, unknown>
+    const listLike = (createdObj.list && typeof createdObj.list === 'object'
+      ? (createdObj.list as Record<string, unknown>)
+      : createdObj)
+    const rawListId = listLike.listId ?? listLike.id
+    const listId = rawListId != null ? String(rawListId) : null
+    const listNameFromHubspot =
+      typeof listLike.name === 'string' ? listLike.name : prefixedName
+
+    if (!listId) {
+      console.error('[create-list] no listId in HubSpot response', created)
+      return NextResponse.json(
+        { error: 'HubSpot did not return a listId — check server logs' },
+        { status: 502 }
+      )
+    }
 
     // 3. Add contacts
-    await addContactsToList(list.listId, contactIds, token)
+    await addContactsToList(listId, contactIds, token)
 
     return NextResponse.json({
       success: true,
-      listId: list.listId,
-      listName: list.name,
+      listId,
+      listName: listNameFromHubspot,
       count: contactIds.length,
     })
   } catch (err) {
@@ -265,7 +284,7 @@ export async function GET(_req: NextRequest) {
         body: JSON.stringify({
           listType: 'STATIC',
           processingTypes: ['MANUAL'],
-          count: 50,
+          count: 500,
         }),
         cache: 'no-store',
       }),

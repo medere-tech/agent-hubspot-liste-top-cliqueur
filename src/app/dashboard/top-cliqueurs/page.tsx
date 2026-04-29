@@ -221,7 +221,7 @@ export default function TopCliqueurs() {
         {!loading && filteredContacts.length > 0 && (
           <button
             onClick={() => downloadCSV(filteredContacts, segment)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-[4px] hover:border-[#0a0a0a] hover:text-[#0a0a0a] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-[4px] hover:border-[#0a0a0a] hover:text-[#0a0a0a] transition-colors cursor-pointer"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M7 2v7M4.5 6.5L7 9l2.5-2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -254,7 +254,7 @@ export default function TopCliqueurs() {
           <button
             key={value}
             onClick={() => { setSegment(value); setThemeFilter('') }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-[4px] border transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-[4px] border transition-colors cursor-pointer ${
               segment === value
                 ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                 : 'bg-white text-[#737373] border-[#e5e5e5] hover:border-[#0a0a0a] hover:text-[#0a0a0a]'
@@ -303,7 +303,7 @@ export default function TopCliqueurs() {
                     `/dashboard/listes?source=${listSource}&theme=${encodeURIComponent(themeFilter)}`
                   )
                 }
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0a0a0a] bg-white border border-[#0a0a0a] rounded-[4px] hover:bg-[#0a0a0a] hover:text-white transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0a0a0a] bg-white border border-[#0a0a0a] rounded-[4px] hover:bg-[#0a0a0a] hover:text-white transition-colors cursor-pointer"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                   <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
@@ -314,7 +314,7 @@ export default function TopCliqueurs() {
               <button
                 type="button"
                 onClick={() => setThemeFilter('')}
-                className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors"
+                className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
               >
                 Effacer
               </button>
@@ -477,7 +477,7 @@ export default function TopCliqueurs() {
               onClick={() => setPage((p) => p - 1)}
               disabled={!hasPrev}
               className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                hasPrev ? 'text-[#0a0a0a] hover:text-[#737373]' : 'text-[#d4d4d4] cursor-not-allowed'
+                hasPrev ? 'text-[#0a0a0a] hover:text-[#737373] cursor-pointer' : 'text-[#d4d4d4] cursor-not-allowed'
               }`}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -495,7 +495,7 @@ export default function TopCliqueurs() {
                   <button
                     key={size}
                     onClick={() => setPageSize(size)}
-                    className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                    className={`px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
                       pageSize === size
                         ? 'bg-[#0a0a0a] text-white'
                         : 'bg-white text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a]'
@@ -511,7 +511,7 @@ export default function TopCliqueurs() {
               onClick={() => setPage((p) => p + 1)}
               disabled={!hasNext}
               className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                hasNext ? 'text-[#0a0a0a] hover:text-[#737373]' : 'text-[#d4d4d4] cursor-not-allowed'
+                hasNext ? 'text-[#0a0a0a] hover:text-[#737373] cursor-pointer' : 'text-[#d4d4d4] cursor-not-allowed'
               }`}
             >
               Suivant

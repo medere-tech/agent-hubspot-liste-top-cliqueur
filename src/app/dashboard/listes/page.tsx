@@ -313,8 +313,42 @@ export default function ListesPage() {
       } else {
         setCreateResult({ ...json, success: true })
         setListName('')
-        // Refresh existing lists
-        await fetchExistingLists()
+
+        // Optimistic UI — prepend the new list immediately so it shows even if
+        // HubSpot's /lists/search index hasn't caught up yet.
+        const newListId = json.listId != null ? String(json.listId) : null
+        const optimistic: HubSpotList | null = newListId
+          ? {
+              listId: newListId,
+              name: (json.listName ?? '').replace(/^\[Agent\]\s*/, ''),
+              createdAt: new Date().toISOString(),
+              additionalProperties: { hs_list_size: String(json.count ?? 0) },
+            }
+          : null
+
+        if (optimistic) {
+          setExistingLists((prev) => [
+            optimistic,
+            ...prev.filter((l) => l.listId !== optimistic.listId),
+          ])
+        }
+
+        // Refresh existing lists — keep optimistic on top if HubSpot index lags
+        try {
+          const listsRes = await fetch('/api/hubspot/listes')
+          if (listsRes.ok) {
+            const listsJson = (await listsRes.json()) as ListesApiResponse
+            const fetched = listsJson.lists ?? []
+            if (optimistic && !fetched.some((l) => l.listId === optimistic.listId)) {
+              setExistingLists([optimistic, ...fetched])
+            } else {
+              setExistingLists(fetched)
+            }
+            setPortalId(listsJson.portalId ?? null)
+          }
+        } catch {
+          // optimistic prepend is already shown — silent fail
+        }
       }
     } catch (err) {
       setCreateResult({ success: false, error: err instanceof Error ? err.message : 'Erreur inconnue' })
@@ -402,7 +436,7 @@ export default function ListesPage() {
                   key={value}
                   type="button"
                   onClick={() => setSource(value)}
-                  className={`px-3 py-2 text-xs font-medium rounded-[4px] border transition-colors ${
+                  className={`px-3 py-2 text-xs font-medium rounded-[4px] border transition-colors cursor-pointer ${
                     source === value
                       ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                       : 'bg-white text-[#737373] border-[#e5e5e5] hover:border-[#0a0a0a] hover:text-[#0a0a0a]'
@@ -443,7 +477,7 @@ export default function ListesPage() {
                   <button
                     type="button"
                     onClick={() => setFilterTheme('')}
-                    className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors"
+                    className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
                   >
                     Effacer
                   </button>
@@ -608,7 +642,7 @@ export default function ListesPage() {
               disabled={!canSubmit}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-[4px] border transition-colors ${
                 canSubmit
-                  ? 'bg-[#0a0a0a] text-white border-[#0a0a0a] hover:bg-[#262626]'
+                  ? 'bg-[#0a0a0a] text-white border-[#0a0a0a] hover:bg-[#262626] cursor-pointer'
                   : 'bg-[#f5f5f5] text-[#a3a3a3] border-[#e5e5e5] cursor-not-allowed'
               }`}
             >
@@ -644,7 +678,7 @@ export default function ListesPage() {
             type="button"
             onClick={fetchExistingLists}
             disabled={loadingLists}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-[4px] hover:border-[#0a0a0a] hover:text-[#0a0a0a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-[4px] hover:border-[#0a0a0a] hover:text-[#0a0a0a] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
               <path d="M10.5 6A4.5 4.5 0 111.5 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
