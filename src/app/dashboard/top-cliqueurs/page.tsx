@@ -9,7 +9,6 @@ import { useRouter } from 'next/navigation'
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 type PageSizeOption = (typeof PAGE_SIZE_OPTIONS)[number]
 
-type Period = 7 | 28 | 90 | 360
 type Segment = 'all' | 'inscrits' | 'non_inscrits'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

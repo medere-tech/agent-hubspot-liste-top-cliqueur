@@ -7,7 +7,7 @@
  */
 
 import { getMarketingEmails } from '@/lib/hubspot'
-import type { MarketingEmail, EmailType } from '@/lib/hubspot'
+import type { MarketingEmail } from '@/lib/hubspot'
 
 // ── Reproduit exactement computeThemeRows du dashboard ──────────────────────
 

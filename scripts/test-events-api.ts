@@ -56,7 +56,6 @@ async function main() {
   show('[4] /crm/v3/objects/contacts (hs_email_click > 10)', e4.status, e4.body)
 
   // ── 5. CRM Search — contacts triés par hs_email_click ────────────────────
-  const e5 = await hubRaw('/crm/v3/objects/contacts/search', {})
   // POST via fetch car body JSON requis
   const token = process.env.HUBSPOT_ACCESS_TOKEN!
   const res5 = await fetch(`${BASE}/crm/v3/objects/contacts/search`, {

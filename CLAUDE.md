@@ -178,7 +178,7 @@ Les emails HubSpot suivent ce pattern :
 | Export CSV | `app/dashboard/export/` |
 | Croisement HubSpot × Airtable (inscrits/non-inscrits) | `lib/sync.ts`, `lib/airtable.ts` |
 | Pipeline sync paginé (150 contacts/run → thèmes → Supabase upsert, cap 10 000) | `lib/sync.ts` |
-| Cron Vercel toutes les 6h (4x/jour, cycle complet ~23j) | `app/api/cron/sync-contacts/`, `vercel.json` |
+| Cron Vercel 1x/jour à 1h UTC (cycle complet ~67j, limite Hobby Vercel) | `app/api/cron/sync-contacts/`, `vercel.json` |
 | Sidebar navigation | `components/sidebar.tsx` |
 
 ### En cours / Bloquant
