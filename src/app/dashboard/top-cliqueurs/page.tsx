@@ -4,6 +4,7 @@ import type { EnrichedTopClicker, MarketingEmail } from '@/lib/hubspot'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { downloadCSV } from '@/lib/csv'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ function uniqueSortedThemes(emails: MarketingEmail[]): string[] {
   return [...themes].sort((a, b) => a.localeCompare(b, 'fr'))
 }
 
-function downloadCSV(contacts: EnrichedTopClicker[], segment: Segment) {
+function exportTopCliqueursCSV(contacts: EnrichedTopClicker[], segment: Segment) {
   let header: string[]
   let rows: string[][]
 
@@ -82,16 +83,8 @@ function downloadCSV(contacts: EnrichedTopClicker[], segment: Segment) {
     ])
   }
 
-  const csv = [header, ...rows]
-    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `top-cliqueurs-${segment}-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  const filename = `top-cliqueurs-${segment}-${new Date().toISOString().slice(0, 10)}.csv`
+  downloadCSV(filename, header, rows)
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -221,7 +214,7 @@ export default function TopCliqueurs() {
         {/* Export CSV */}
         {!loading && filteredContacts.length > 0 && (
           <button
-            onClick={() => downloadCSV(filteredContacts, segment)}
+            onClick={() => exportTopCliqueursCSV(filteredContacts, segment)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-[4px] hover:border-[#0a0a0a] hover:text-[#0a0a0a] transition-colors cursor-pointer"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
