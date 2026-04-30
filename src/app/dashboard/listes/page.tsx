@@ -35,7 +35,7 @@ interface ListesApiResponse {
 
 interface CreateResult {
   success: boolean
-  listId?: number
+  listId?: string
   listName?: string
   count?: number
   error?: string
@@ -448,8 +448,10 @@ export default function ListesPage() {
             </div>
           </div>
 
-          {/* Filtre thématique optionnel pour inscrits et non_inscrits */}
-          {(source === 'inscrits' || source === 'non_inscrits') && themes.length > 0 && (
+          {/* Filtre thématique optionnel — INSCRITS UNIQUEMENT.
+              Pour non_inscrits, le filtre est désactivé : par définition, ces contacts
+              n'ont aucune inscription Airtable, donc le filtre nomFormation ramène 0. */}
+          {source === 'inscrits' && themes.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
                 Filtrer par thématique{' '}
@@ -460,7 +462,7 @@ export default function ListesPage() {
                   <select
                     value={filterTheme}
                     onChange={(e) => setFilterTheme(e.target.value)}
-                    className="pl-3 pr-8 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none"
+                    className="pl-3 pr-8 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer"
                   >
                     <option value="">Toutes les thématiques</option>
                     {themes.map((t) => (
@@ -486,6 +488,15 @@ export default function ListesPage() {
             </div>
           )}
 
+          {/* Indication pour non_inscrits — pourquoi pas de filtre ici */}
+          {source === 'non_inscrits' && (
+            <div className="text-xs text-[#a3a3a3] italic">
+              Pour cibler les non-inscrits par thématique, utilise le mode{' '}
+              <strong className="text-[#737373] not-italic">Prospects chauds</strong>{' '}
+              depuis la page Thématiques.
+            </div>
+          )}
+
           {/* Dropdown thème principal (source = thematique) */}
           {source === 'thematique' && (
             <div>
@@ -500,7 +511,7 @@ export default function ListesPage() {
                 <select
                   value={selectedTheme}
                   onChange={(e) => setSelectedTheme(e.target.value)}
-                  className="w-full max-w-[480px] px-3 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none"
+                  className="w-full max-w-[480px] px-3 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer"
                 >
                   <option value="">— Choisir une thématique —</option>
                   {themes.map((t) => (
@@ -611,7 +622,7 @@ export default function ListesPage() {
                       <>
                         {' '}
                         <a
-                          href={`https://app.hubspot.com/contacts/${portalId}/lists/${createResult.listId}`}
+                          href={`https://app-eu1.hubspot.com/contacts/${portalId}/objectLists/${createResult.listId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="underline text-[#0a0a0a] hover:text-[#737373]"
@@ -751,7 +762,7 @@ export default function ListesPage() {
                   <td className="px-6 py-3.5 text-right">
                     {portalId ? (
                       <a
-                        href={`https://app.hubspot.com/contacts/${portalId}/lists/${list.listId}`}
+                        href={`https://app-eu1.hubspot.com/contacts/${portalId}/objectLists/${list.listId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-xs text-[#737373] hover:text-[#0a0a0a] transition-colors"
