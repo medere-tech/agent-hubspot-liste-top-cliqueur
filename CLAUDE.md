@@ -32,17 +32,23 @@ src/
   app/
     api/
       auth/[...nextauth]/         # Auth NextAuth
-      cron/sync-contacts/         # Cron Vercel — sync paginée toutes les 6h
+      cron/sync-contacts/         # Cron Vercel — sync paginée 1x/jour à 1h UTC
+      contacts/
+        [email]/                  # GET fiche contact (Supabase + HubSpot enrichment)
+        by-theme/                 # GET non-inscrits avec thèmes (filtre theme optionnel)
+        inscrits/                 # GET inscrits avec thèmes (filtre theme optionnel)
       hubspot/
-        campaigns/                # GET campagnes email HubSpot
+        campaigns/                # GET campagnes email HubSpot (vue dashboard principal)
         listes/                   # GET listes existantes / POST création liste
-        top-cliqueurs/            # GET top cliqueurs (360 jours)
+        thematiques/              # GET agrégat thèmes par contact (Supabase)
+        top-cliqueurs/            # GET top 100 cliqueurs (HubSpot lifetime + Airtable)
     login/                        # Page de connexion
     dashboard/
-      page.tsx                    # Vue principale (thématiques + filtres)
-      thematiques/page.tsx        # Dashboard thématiques
+      page.tsx                    # Vue principale (thématiques campagnes + filtres)
+      thematiques/page.tsx        # Vue agrégée par thème (Supabase)
       top-cliqueurs/page.tsx      # Top cliqueurs avec pagination
       listes/page.tsx             # Création et gestion des listes HubSpot
+      contacts/[email]/page.tsx   # Fiche détail contact (thèmes, clics, inscriptions)
       export/page.tsx             # Export CSV
       layout.tsx                  # Layout dashboard avec sidebar
   lib/
@@ -195,6 +201,20 @@ Les emails HubSpot suivent ce pattern :
 - Notifications automatiques
 - Intégration d'autres outils
 
+## Architecture des filtres de la page Listes
+
+La page `/dashboard/listes` propose **3 modes** pour la création de listes HubSpot — tous lisent `contact_click_themes` Supabase comme source unique. Le filtre `clicks >= 3` est garanti par `sync.ts:144` au moment du sync, donc tout thème stocké est par définition "qualifié".
+
+| Mode | Route API | Filtre Supabase | Filtre thématique |
+|---|---|---|---|
+| `inscrits` | `GET /api/contacts/inscrits[?theme=X]` | `is_inscrit = true` ET `themes` non vide | dropdown alimenté par `uniqueThemes` de la réponse |
+| `non_inscrits` | `GET /api/contacts/by-theme[?theme=X]` | `is_inscrit = false` ET `themes` non vide | idem |
+| `prospects_chauds` | `GET /api/contacts/by-theme?theme=X` (theme requis) | `is_inscrit = false` ET match exact thème (case-insensitive) | défini par URL — accessible via le lien de `/dashboard/thematiques` |
+
+**Mode `thematique` retiré** (avril 2026). Il filtrait `topData.segments.inscrits` par substring sur `nomFormation` Airtable — sémantiquement faux (le nom de formation Airtable n'est pas le thème HubSpot). Remplacé par `inscrits + dropdown thème Supabase`, qui fait un match exact.
+
+**Aucune route ne dépend plus de `getTopClickersEnriched` pour les modes de listes** — `topData` n'est plus fetché au mount. Conséquence : la page Listes ne consomme plus que Supabase, et hérite donc de la fraîcheur du cron (1×/jour).
+
 ## Décisions techniques
 
 | Décision | Raison |
@@ -202,11 +222,14 @@ Les emails HubSpot suivent ce pattern :
 | `service_role` pour toutes les writes Supabase | Sync s'exécute côté serveur (cron + API route), pas de session utilisateur |
 | HubSpot v1 Events API (non CRM v3) | Seule API qui expose les événements CLICK par email individuel |
 | Throttle 150ms entre contacts HubSpot | Rate limit v1 API : ~100 req/10s — évite les 429 |
-| Thèmes filtrés à >= 3 clics | Seuil de pertinence — évite le bruit des clics accidentels |
+| Thèmes filtrés à >= 3 clics au sync | Seuil de pertinence — évite le bruit des clics accidentels. Tout thème en base est qualifié |
 | Batches de 10 emails Airtable | Limite longueur URL des formules `filterByFormula` |
 | CRM v3 search avec `filterGroups` EQ (5 par batch) | Contrainte HubSpot : max 5 filterGroups par requête search |
 | Préfixe `[Agent]` sur les listes créées | Distinguer les listes app des listes manuelles, jamais supprimées |
 | `NOTIFY pgrst, 'reload schema'` obligatoire | PostgREST ne détecte pas automatiquement les nouvelles tables |
+| `parseEmailName` (lib/hubspot.ts) source unique de vérité pour le parsing du thème | Utilisée par les deux pipelines (live `getMarketingEmails` + sync `getContactClickThemes`). Tout changement de format se fait à un seul endroit |
+| Routes `tags: ['hubspot']` + cron `revalidateTag('hubspot', { expire: 0 })` | Invalide tous les caches après chaque sync — évite les listes périmées |
+| URL HubSpot EU : `app-eu1.hubspot.com/.../objectLists/{id}` | Portail Médéré hébergé en EU. Les URLs `/lists/` redirigent mais perdent les paramètres |
 
 ## Workflow de développement
 

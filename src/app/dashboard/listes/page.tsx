@@ -1,24 +1,11 @@
 'use client'
 
-import type { EnrichedTopClicker, MarketingEmail } from '@/lib/hubspot'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Source = 'inscrits' | 'non_inscrits' | 'thematique' | 'prospects_chauds'
-
-interface TopCliqueurApiResponse {
-  contacts: EnrichedTopClicker[]
-  segments: {
-    inscrits: EnrichedTopClicker[]
-    non_inscrits_engages: EnrichedTopClicker[]
-  }
-}
-
-interface CampaignsApiResponse {
-  emails: { data: MarketingEmail[] }
-}
+type Source = 'inscrits' | 'non_inscrits' | 'prospects_chauds'
 
 interface HubSpotList {
   listId: string
@@ -42,8 +29,9 @@ interface CreateResult {
   error?: string
 }
 
-// Miroir local du retour de /api/contacts/by-theme
-interface HotProspect {
+// Forme commune des contacts retournés par /api/contacts/by-theme et /api/contacts/inscrits.
+// La route inscrits ajoute `inscriptions`, qu'on ignore côté tableau.
+interface ContactItem {
   email: string
   contactId: string
   totalClicks: number
@@ -51,11 +39,11 @@ interface HotProspect {
   lastClickOnTheme: string
 }
 
-interface HotProspectsApiResponse {
+interface ContactsApiResponse {
   theme: string | null
   minClicks: number
   count: number
-  prospects: HotProspect[]
+  prospects: ContactItem[]
   uniqueThemes: string[]
 }
 
@@ -66,28 +54,11 @@ function fmtDate(iso: string | undefined): string {
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso))
 }
 
-function uniqueSortedThemes(emails: MarketingEmail[]): string[] {
-  const themes = new Set<string>()
-  for (const e of emails) {
-    if (e.theme && e.theme !== 'Sans thème' && e.theme !== 'Newsletter') {
-      themes.add(e.theme)
-    }
-  }
-  return [...themes].sort((a, b) => a.localeCompare(b, 'fr'))
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Spinner() {
   return (
-    <svg
-      className="animate-spin"
-      width="14"
-      height="14"
-      viewBox="0 0 14 14"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg className="animate-spin" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <circle cx="7" cy="7" r="5" stroke="#d4d4d4" strokeWidth="1.5" />
       <path d="M7 2a5 5 0 015 5" stroke="#0a0a0a" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
@@ -106,67 +77,151 @@ function ErrorBanner({ message }: { message: string }) {
   )
 }
 
+// Tableau preview commun aux 3 modes.
+function PreviewTable({
+  data, loading, selectedTheme, error, emptyAllMessage, emptyFilteredMessage,
+}: {
+  data: ContactItem[] | null
+  loading: boolean
+  selectedTheme: string
+  error: string
+  emptyAllMessage: string
+  emptyFilteredMessage: string
+}) {
+  return (
+    <>
+      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
+      <div className="border border-[#e5e5e5] rounded-[4px] overflow-hidden max-h-[360px] overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-[#fafafa] sticky top-0">
+            <tr className="border-b border-[#e5e5e5]">
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                Email
+              </th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                {selectedTheme ? 'Clics sur le thème' : 'Clics totaux'}
+              </th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                Dernier clic
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-[#f5f5f5] last:border-0">
+                  <td className="px-4 py-2.5"><div className="h-4 w-48 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                  <td className="px-4 py-2.5"><div className="h-4 w-8 bg-[#f5f5f5] rounded animate-pulse ml-auto" /></td>
+                  <td className="px-4 py-2.5"><div className="h-4 w-20 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                </tr>
+              ))
+            ) : (data?.length ?? 0) === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
+                  {selectedTheme ? emptyFilteredMessage : emptyAllMessage}
+                </td>
+              </tr>
+            ) : (
+              data!.map((p) => (
+                <tr key={p.email} className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors">
+                  <td className="px-4 py-2.5">
+                    <Link
+                      href={`/dashboard/contacts/${encodeURIComponent(p.email)}`}
+                      className="text-[#0a0a0a] hover:underline cursor-pointer"
+                    >
+                      {p.email}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
+                  <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+// Dropdown thème commun aux modes inscrits/non_inscrits.
+function ThemeFilterDropdown({
+  value, onChange, options, loading,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  loading: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={loading && options.length === 0}
+          className="pl-3 pr-8 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">Toutes les thématiques</option>
+          {options.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M2 3.5l3 3 3-3" stroke="#a3a3a3" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </div>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
+        >
+          Effacer
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ListesPage() {
-  // ── Data state ─────────────────────────────────────────────────────────────
-  const [topData, setTopData] = useState<TopCliqueurApiResponse | null>(null)
-  const [themes, setThemes] = useState<string[]>([])
+  // ── Listes existantes ─────────────────────────────────────────────────────
   const [existingLists, setExistingLists] = useState<HubSpotList[]>([])
   const [portalId, setPortalId] = useState<number | null>(null)
-
-  const [loadingData, setLoadingData] = useState(true)
   const [loadingLists, setLoadingLists] = useState(true)
-  const [dataError, setDataError] = useState('')
   const [listsError, setListsError] = useState('')
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [listName, setListName] = useState('')
   const [source, setSource] = useState<Source>('inscrits')
-  const [selectedTheme, setSelectedTheme] = useState('')
-  const [filterTheme, setFilterTheme] = useState('')   // filtre optionnel pour inscrits/non_inscrits
   const [creating, setCreating] = useState(false)
   const [createResult, setCreateResult] = useState<CreateResult | null>(null)
 
-  // ── Prospects chauds state (mode prospects_chauds, URL-driven) ─────────────
-  const [prospectsTheme, setProspectsTheme] = useState('')
-  const [prospectsData, setProspectsData] = useState<HotProspect[] | null>(null)
-  const [prospectsLoading, setProspectsLoading] = useState(false)
-  const [prospectsError, setProspectsError] = useState('')
+  // ── Inscrits state (Supabase) ──────────────────────────────────────────────
+  const [inscritsData, setInscritsData] = useState<ContactItem[] | null>(null)
+  const [inscritsThemes, setInscritsThemes] = useState<string[]>([])
+  const [inscritsSelectedTheme, setInscritsSelectedTheme] = useState('')
+  const [inscritsLoading, setInscritsLoading] = useState(false)
+  const [inscritsError, setInscritsError] = useState('')
 
-  // ── Non-inscrits state (mode non_inscrits, Supabase) ───────────────────────
-  const [nonInscritsData, setNonInscritsData] = useState<HotProspect[] | null>(null)
+  // ── Non-inscrits state (Supabase) ──────────────────────────────────────────
+  const [nonInscritsData, setNonInscritsData] = useState<ContactItem[] | null>(null)
   const [nonInscritsThemes, setNonInscritsThemes] = useState<string[]>([])
   const [nonInscritsSelectedTheme, setNonInscritsSelectedTheme] = useState('')
   const [nonInscritsLoading, setNonInscritsLoading] = useState(false)
   const [nonInscritsError, setNonInscritsError] = useState('')
 
+  // ── Prospects chauds state (Supabase, URL-driven) ──────────────────────────
+  const [prospectsTheme, setProspectsTheme] = useState('')
+  const [prospectsData, setProspectsData] = useState<ContactItem[] | null>(null)
+  const [prospectsLoading, setProspectsLoading] = useState(false)
+  const [prospectsError, setProspectsError] = useState('')
+
   const nameInputRef = useRef<HTMLInputElement>(null)
-
-  // ── Fetch top cliqueurs + campaigns ────────────────────────────────────────
-  const fetchInitialData = useCallback(async () => {
-    setLoadingData(true)
-    setDataError('')
-    try {
-      const [topRes, campaignsRes] = await Promise.all([
-        fetch('/api/hubspot/top-cliqueurs'),
-        fetch('/api/hubspot/campaigns?days=360'),
-      ])
-
-      if (!topRes.ok) throw new Error(`Erreur top cliqueurs: ${topRes.status}`)
-      const topJson = (await topRes.json()) as TopCliqueurApiResponse
-      setTopData(topJson)
-
-      if (campaignsRes.ok) {
-        const campJson = (await campaignsRes.json()) as CampaignsApiResponse
-        setThemes(uniqueSortedThemes(campJson.emails?.data ?? []))
-      }
-    } catch (err) {
-      setDataError(err instanceof Error ? err.message : 'Erreur de chargement')
-    } finally {
-      setLoadingData(false)
-    }
-  }, [])
 
   // ── Fetch existing lists ────────────────────────────────────────────────────
   const fetchExistingLists = useCallback(async () => {
@@ -195,7 +250,6 @@ export default function ListesPage() {
     const s = params.get('source')
     const t = params.get('theme')
 
-    // Mode prospects_chauds — early return pour ne pas polluer filterTheme
     if (s === 'prospects_chauds' && t) {
       setSource('prospects_chauds')
       setProspectsTheme(t)
@@ -203,50 +257,53 @@ export default function ListesPage() {
       return
     }
 
-    if (s === 'inscrits' || s === 'non_inscrits' || s === 'thematique') {
+    if (s === 'inscrits' || s === 'non_inscrits') {
       setSource(s)
+      if (t && s === 'inscrits') setInscritsSelectedTheme(t)
+      if (t && s === 'non_inscrits') setNonInscritsSelectedTheme(t)
     }
-    if (t) setFilterTheme(t)
   }, [])
 
   useEffect(() => {
-    fetchInitialData()
     fetchExistingLists()
-  }, [fetchInitialData, fetchExistingLists])
+  }, [fetchExistingLists])
 
-  // Reset states when source changes — preserve prospects_chauds context
+  // Reset feedback on source change
   useEffect(() => {
     setCreateResult(null)
-    if (source === 'prospects_chauds') return
-    if (source !== 'thematique') setSelectedTheme('')
-    if (source === 'thematique') setFilterTheme('')
   }, [source])
 
-  // ── Fetch prospects chauds quand on entre dans le mode ────────────────────
+  // ── Fetch inscrits ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (source !== 'prospects_chauds' || !prospectsTheme) return
+    if (source !== 'inscrits') return
     let cancelled = false
     const load = async () => {
-      setProspectsLoading(true)
-      setProspectsError('')
+      setInscritsLoading(true)
+      setInscritsError('')
       try {
-        const res = await fetch(`/api/contacts/by-theme?theme=${encodeURIComponent(prospectsTheme)}`)
+        const url = inscritsSelectedTheme
+          ? `/api/contacts/inscrits?theme=${encodeURIComponent(inscritsSelectedTheme)}`
+          : '/api/contacts/inscrits'
+        const res = await fetch(url)
         const json = await res.json()
         if (!res.ok) {
           throw new Error((json as { error?: string })?.error ?? `Erreur ${res.status}`)
         }
-        if (!cancelled) setProspectsData((json as HotProspectsApiResponse).prospects ?? [])
+        if (cancelled) return
+        const apiData = json as ContactsApiResponse
+        setInscritsData(apiData.prospects ?? [])
+        setInscritsThemes(apiData.uniqueThemes ?? [])
       } catch (err) {
-        if (!cancelled) setProspectsError(err instanceof Error ? err.message : 'Erreur inconnue')
+        if (!cancelled) setInscritsError(err instanceof Error ? err.message : 'Erreur inconnue')
       } finally {
-        if (!cancelled) setProspectsLoading(false)
+        if (!cancelled) setInscritsLoading(false)
       }
     }
     load()
     return () => { cancelled = true }
-  }, [source, prospectsTheme])
+  }, [source, inscritsSelectedTheme])
 
-  // ── Fetch non_inscrits (Supabase) quand on entre dans le mode ou qu'on change le thème ─
+  // ── Fetch non-inscrits ─────────────────────────────────────────────────────
   useEffect(() => {
     if (source !== 'non_inscrits') return
     let cancelled = false
@@ -263,12 +320,9 @@ export default function ListesPage() {
           throw new Error((json as { error?: string })?.error ?? `Erreur ${res.status}`)
         }
         if (cancelled) return
-        const apiData = json as HotProspectsApiResponse
+        const apiData = json as ContactsApiResponse
         setNonInscritsData(apiData.prospects ?? [])
-        // Le dropdown reste stable : on ne le remplit qu'à la 1re fetch (sans filtre)
-        if (!nonInscritsSelectedTheme) {
-          setNonInscritsThemes(apiData.uniqueThemes ?? [])
-        }
+        setNonInscritsThemes(apiData.uniqueThemes ?? [])
       } catch (err) {
         if (!cancelled) setNonInscritsError(err instanceof Error ? err.message : 'Erreur inconnue')
       } finally {
@@ -279,42 +333,35 @@ export default function ListesPage() {
     return () => { cancelled = true }
   }, [source, nonInscritsSelectedTheme])
 
+  // ── Fetch prospects chauds ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (source !== 'prospects_chauds' || !prospectsTheme) return
+    let cancelled = false
+    const load = async () => {
+      setProspectsLoading(true)
+      setProspectsError('')
+      try {
+        const res = await fetch(`/api/contacts/by-theme?theme=${encodeURIComponent(prospectsTheme)}`)
+        const json = await res.json()
+        if (!res.ok) {
+          throw new Error((json as { error?: string })?.error ?? `Erreur ${res.status}`)
+        }
+        if (!cancelled) setProspectsData((json as ContactsApiResponse).prospects ?? [])
+      } catch (err) {
+        if (!cancelled) setProspectsError(err instanceof Error ? err.message : 'Erreur inconnue')
+      } finally {
+        if (!cancelled) setProspectsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [source, prospectsTheme])
+
   // ── Compute emails for selected source ─────────────────────────────────────
   const contactEmails: string[] = (() => {
-    if (source === 'prospects_chauds') {
-      return prospectsData?.map((p) => p.email) ?? []
-    }
-
-    if (source === 'non_inscrits') {
-      return nonInscritsData?.map((p) => p.email) ?? []
-    }
-
-    if (!topData) return []
-
-    if (source === 'inscrits') {
-      const base = topData.segments.inscrits
-      if (filterTheme) {
-        return base
-          .filter((c) =>
-            c.inscriptions.some((ins) =>
-              ins.nomFormation.toLowerCase().includes(filterTheme.toLowerCase())
-            )
-          )
-          .map((c) => c.emailAddress)
-      }
-      return base.map((c) => c.emailAddress)
-    }
-
-    // thematique: inscrits whose formation name includes the selected theme
-    if (selectedTheme) {
-      return topData.segments.inscrits
-        .filter((c) =>
-          c.inscriptions.some((ins) =>
-            ins.nomFormation.toLowerCase().includes(selectedTheme.toLowerCase())
-          )
-        )
-        .map((c) => c.emailAddress)
-    }
+    if (source === 'prospects_chauds') return prospectsData?.map((p) => p.email) ?? []
+    if (source === 'non_inscrits')     return nonInscritsData?.map((p) => p.email) ?? []
+    if (source === 'inscrits')         return inscritsData?.map((p) => p.email) ?? []
     return []
   })()
 
@@ -323,21 +370,21 @@ export default function ListesPage() {
   // ── Form submit ─────────────────────────────────────────────────────────────
   async function handleCreate() {
     if (!listName.trim() || creating) return
-    if (source === 'thematique' && !selectedTheme) return
-    if (source === 'prospects_chauds' && (!prospectsTheme || contactCount === 0)) return
+    if (contactCount === 0) return
 
     setCreating(true)
     setCreateResult(null)
 
     try {
       // L'API valide source ∈ {inscrits, non_inscrits, thematique} ; on map
-      // prospects_chauds → 'thematique' pour passer la validation. La valeur
-      // n'est utilisée que par la validation côté API, pas dans la création.
+      // prospects_chauds → 'thematique' pour passer la validation. Cette valeur
+      // est seulement validée côté API, pas utilisée dans la création.
       const apiSource = source === 'prospects_chauds' ? 'thematique' : source
       const theme =
         source === 'prospects_chauds' ? prospectsTheme :
-        source === 'thematique' ? selectedTheme :
-        filterTheme || undefined
+        source === 'inscrits'         ? (inscritsSelectedTheme || undefined) :
+        source === 'non_inscrits'     ? (nonInscritsSelectedTheme || undefined) :
+        undefined
 
       const res = await fetch('/api/hubspot/listes', {
         method: 'POST',
@@ -357,8 +404,7 @@ export default function ListesPage() {
         setCreateResult({ ...json, success: true })
         setListName('')
 
-        // Optimistic UI — prepend the new list immediately so it shows even if
-        // HubSpot's /lists/search index hasn't caught up yet.
+        // Optimistic UI — prepend the new list immediately
         const newListId = json.listId != null ? String(json.listId) : null
         const optimistic: HubSpotList | null = newListId
           ? {
@@ -376,7 +422,7 @@ export default function ListesPage() {
           ])
         }
 
-        // Refresh existing lists — keep optimistic on top if HubSpot index lags
+        // Refresh — keep optimistic on top if HubSpot index lags
         try {
           const listsRes = await fetch('/api/hubspot/listes')
           if (listsRes.ok) {
@@ -390,7 +436,7 @@ export default function ListesPage() {
             setPortalId(listsJson.portalId ?? null)
           }
         } catch {
-          // optimistic prepend is already shown — silent fail
+          // optimistic is shown — silent fail
         }
       }
     } catch (err) {
@@ -400,39 +446,27 @@ export default function ListesPage() {
     }
   }
 
+  const sourceLoading =
+    source === 'prospects_chauds' ? prospectsLoading :
+    source === 'non_inscrits'     ? nonInscritsLoading :
+    inscritsLoading
+
   const canSubmit =
     listName.trim() !== '' &&
     !creating &&
-    (
-      source === 'prospects_chauds'
-        ? !prospectsLoading && contactCount > 0
-        : source === 'non_inscrits'
-        ? !nonInscritsLoading && contactCount > 0
-        : !loadingData && (source !== 'thematique' || selectedTheme !== '')
-    )
-
-  const showPreview =
-    source === 'prospects_chauds' ? !prospectsLoading :
-    source === 'non_inscrits'     ? !nonInscritsLoading :
-    !loadingData && (source !== 'thematique' || selectedTheme)
+    !sourceLoading &&
+    contactCount > 0
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="px-8 py-8 max-w-[1200px]">
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Listes HubSpot</h1>
         <p className="text-sm text-[#737373] mt-0.5">
-          Création de listes statiques depuis les top cliqueurs et thématiques
+          Création de listes statiques depuis les contacts cliqueurs (≥3 clics par thème)
         </p>
       </div>
-
-      {dataError && (
-        <div className="mb-6">
-          <ErrorBanner message={dataError} />
-        </div>
-      )}
 
       {/* ── SECTION A — Créer une liste ─────────────────────────────────────── */}
       <div className="bg-white border border-[#e5e5e5] rounded-[6px] mb-6">
@@ -469,9 +503,8 @@ export default function ListesPage() {
             <div className="flex items-center gap-2 flex-wrap">
               {(
                 [
-                  { value: 'inscrits',     label: 'Top cliqueurs inscrits' },
-                  { value: 'non_inscrits', label: 'Top cliqueurs non inscrits' },
-                  { value: 'thematique',   label: 'Thématique' },
+                  { value: 'inscrits',     label: 'Inscrits' },
+                  { value: 'non_inscrits', label: 'Non inscrits' },
                   ...(prospectsTheme
                     ? [{ value: 'prospects_chauds' as Source, label: 'Prospects chauds' }]
                     : []),
@@ -493,244 +526,73 @@ export default function ListesPage() {
             </div>
           </div>
 
-          {/* Filtre thématique optionnel — INSCRITS UNIQUEMENT.
-              Pour non_inscrits, le filtre est désactivé : par définition, ces contacts
-              n'ont aucune inscription Airtable, donc le filtre nomFormation ramène 0. */}
-          {source === 'inscrits' && themes.length > 0 && (
+          {/* Mode inscrits */}
+          {source === 'inscrits' && (
             <div>
               <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
                 Filtrer par thématique{' '}
                 <span className="text-[#a3a3a3] font-normal">(optionnel)</span>
               </label>
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <select
-                    value={filterTheme}
-                    onChange={(e) => setFilterTheme(e.target.value)}
-                    className="pl-3 pr-8 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Toutes les thématiques</option>
-                    {themes.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                      <path d="M2 3.5l3 3 3-3" stroke="#a3a3a3" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </div>
-                {filterTheme && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterTheme('')}
-                    className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
-                  >
-                    Effacer
-                  </button>
-                )}
-              </div>
+              <ThemeFilterDropdown
+                value={inscritsSelectedTheme}
+                onChange={setInscritsSelectedTheme}
+                options={inscritsThemes}
+                loading={inscritsLoading}
+              />
+              <PreviewTable
+                data={inscritsData}
+                loading={inscritsLoading}
+                selectedTheme={inscritsSelectedTheme}
+                error={inscritsError}
+                emptyAllMessage="Aucun inscrit avec thématique en base."
+                emptyFilteredMessage="Aucun inscrit n'a cliqué sur ce thème."
+              />
             </div>
           )}
 
-          {/* Mode non_inscrits — filtre thématique Supabase + tableau preview */}
+          {/* Mode non_inscrits */}
           {source === 'non_inscrits' && (
             <div>
               <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
                 Filtrer par thématique{' '}
                 <span className="text-[#a3a3a3] font-normal">(optionnel)</span>
               </label>
-
-              <div className="flex items-center gap-2 mb-3">
-                <div className="relative">
-                  <select
-                    value={nonInscritsSelectedTheme}
-                    onChange={(e) => setNonInscritsSelectedTheme(e.target.value)}
-                    disabled={nonInscritsLoading && nonInscritsThemes.length === 0}
-                    className="pl-3 pr-8 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">Tous les non-inscrits</option>
-                    {nonInscritsThemes.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                      <path d="M2 3.5l3 3 3-3" stroke="#a3a3a3" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </div>
-                {nonInscritsSelectedTheme && (
-                  <button
-                    type="button"
-                    onClick={() => setNonInscritsSelectedTheme('')}
-                    className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
-                  >
-                    Effacer
-                  </button>
-                )}
-              </div>
-
-              {nonInscritsError && (
-                <div className="mb-3"><ErrorBanner message={nonInscritsError} /></div>
-              )}
-
-              <div className="border border-[#e5e5e5] rounded-[4px] overflow-hidden max-h-[360px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-[#fafafa] sticky top-0">
-                    <tr className="border-b border-[#e5e5e5]">
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
-                        Email
-                      </th>
-                      <th className="px-4 py-2.5 text-right text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
-                        {nonInscritsSelectedTheme ? 'Clics sur le thème' : 'Clics totaux'}
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
-                        Dernier clic
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {nonInscritsLoading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <tr key={i} className="border-b border-[#f5f5f5] last:border-0">
-                          <td className="px-4 py-2.5">
-                            <div className="h-4 w-48 bg-[#f5f5f5] rounded animate-pulse" />
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="h-4 w-8 bg-[#f5f5f5] rounded animate-pulse ml-auto" />
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="h-4 w-20 bg-[#f5f5f5] rounded animate-pulse" />
-                          </td>
-                        </tr>
-                      ))
-                    ) : (nonInscritsData?.length ?? 0) === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
-                          {nonInscritsSelectedTheme
-                            ? 'Aucun non-inscrit n\'a cliqué sur ce thème.'
-                            : 'Aucun non-inscrit avec thématique en base.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      nonInscritsData!.map((p) => (
-                        <tr key={p.email} className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors">
-                          <td className="px-4 py-2.5">
-                            <Link
-                              href={`/dashboard/contacts/${encodeURIComponent(p.email)}`}
-                              className="text-[#0a0a0a] hover:underline cursor-pointer"
-                            >
-                              {p.email}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
-                          <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <ThemeFilterDropdown
+                value={nonInscritsSelectedTheme}
+                onChange={setNonInscritsSelectedTheme}
+                options={nonInscritsThemes}
+                loading={nonInscritsLoading}
+              />
+              <PreviewTable
+                data={nonInscritsData}
+                loading={nonInscritsLoading}
+                selectedTheme={nonInscritsSelectedTheme}
+                error={nonInscritsError}
+                emptyAllMessage="Aucun non-inscrit avec thématique en base."
+                emptyFilteredMessage="Aucun non-inscrit n'a cliqué sur ce thème."
+              />
             </div>
           )}
 
-          {/* Dropdown thème principal (source = thematique) */}
-          {source === 'thematique' && (
-            <div>
-              <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
-                Thématique
-              </label>
-              {themes.length === 0 ? (
-                <p className="text-xs text-[#a3a3a3]">
-                  {loadingData ? 'Chargement des thèmes…' : 'Aucune thématique disponible'}
-                </p>
-              ) : (
-                <select
-                  value={selectedTheme}
-                  onChange={(e) => setSelectedTheme(e.target.value)}
-                  className="w-full max-w-[480px] px-3 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer"
-                >
-                  <option value="">— Choisir une thématique —</option>
-                  {themes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {/* Mode prospects_chauds : tableau preview */}
+          {/* Mode prospects_chauds */}
           {source === 'prospects_chauds' && (
             <div>
               <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
                 Aperçu des prospects chauds — {prospectsTheme}
               </label>
-
-              {prospectsError && (
-                <div className="mb-3"><ErrorBanner message={prospectsError} /></div>
-              )}
-
-              <div className="border border-[#e5e5e5] rounded-[4px] overflow-hidden max-h-[360px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-[#fafafa] sticky top-0">
-                    <tr className="border-b border-[#e5e5e5]">
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
-                        Email
-                      </th>
-                      <th className="px-4 py-2.5 text-right text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
-                        Clics sur le thème
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
-                        Dernier clic
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {prospectsLoading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <tr key={i} className="border-b border-[#f5f5f5] last:border-0">
-                          <td className="px-4 py-2.5">
-                            <div className="h-4 w-48 bg-[#f5f5f5] rounded animate-pulse" />
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="h-4 w-8 bg-[#f5f5f5] rounded animate-pulse ml-auto" />
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="h-4 w-20 bg-[#f5f5f5] rounded animate-pulse" />
-                          </td>
-                        </tr>
-                      ))
-                    ) : (prospectsData?.length ?? 0) === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
-                          Aucun prospect chaud sur ce thème.
-                        </td>
-                      </tr>
-                    ) : (
-                      prospectsData!.map((p) => (
-                        <tr key={p.email} className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors">
-                          <td className="px-4 py-2.5">
-                            <Link
-                              href={`/dashboard/contacts/${encodeURIComponent(p.email)}`}
-                              className="text-[#0a0a0a] hover:underline cursor-pointer"
-                            >
-                              {p.email}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
-                          <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <PreviewTable
+                data={prospectsData}
+                loading={prospectsLoading}
+                selectedTheme={prospectsTheme}
+                error={prospectsError}
+                emptyAllMessage="Aucun prospect chaud."
+                emptyFilteredMessage="Aucun prospect chaud sur ce thème."
+              />
             </div>
           )}
 
-          {/* Preview nom HubSpot + contacts count */}
-          {showPreview && (
+          {/* Preview nom HubSpot + count */}
+          {!sourceLoading && (
             <div className="space-y-1">
               {listName.trim() && (
                 <p className="text-xs text-[#737373]">
@@ -871,18 +733,10 @@ export default function ListesPage() {
             {loadingLists ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-[#f5f5f5] last:border-0">
-                  <td className="px-6 py-3.5">
-                    <div className="h-4 w-56 bg-[#f5f5f5] rounded animate-pulse" />
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <div className="h-4 w-12 bg-[#f5f5f5] rounded animate-pulse" />
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <div className="h-4 w-24 bg-[#f5f5f5] rounded animate-pulse" />
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <div className="h-4 w-16 bg-[#f5f5f5] rounded animate-pulse ml-auto" />
-                  </td>
+                  <td className="px-6 py-3.5"><div className="h-4 w-56 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                  <td className="px-6 py-3.5"><div className="h-4 w-12 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                  <td className="px-6 py-3.5"><div className="h-4 w-24 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                  <td className="px-6 py-3.5"><div className="h-4 w-16 bg-[#f5f5f5] rounded animate-pulse ml-auto" /></td>
                 </tr>
               ))
             ) : existingLists.length === 0 && !listsError ? (
