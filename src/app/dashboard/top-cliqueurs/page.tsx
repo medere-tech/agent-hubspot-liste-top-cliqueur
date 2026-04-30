@@ -3,6 +3,7 @@
 import type { EnrichedTopClicker, MarketingEmail } from '@/lib/hubspot'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -399,7 +400,14 @@ export default function TopCliqueurs() {
                     <td className="px-5 py-3.5 text-xs text-[#a3a3a3] tabular-nums">{rank}</td>
 
                     {/* Contact */}
-                    <td className="px-5 py-3.5 font-medium text-[#0a0a0a]">{c.emailAddress}</td>
+                    <td className="px-5 py-3.5 font-medium">
+                      <Link
+                        href={`/dashboard/contacts/${encodeURIComponent(c.emailAddress)}`}
+                        className="text-[#0a0a0a] hover:underline cursor-pointer"
+                      >
+                        {c.emailAddress}
+                      </Link>
+                    </td>
 
                     {/* Clics totaux */}
                     <td className="px-5 py-3.5 text-[#0a0a0a] tabular-nums font-semibold">

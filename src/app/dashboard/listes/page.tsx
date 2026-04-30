@@ -2,6 +2,7 @@
 
 import type { EnrichedTopClicker, MarketingEmail } from '@/lib/hubspot'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -615,7 +616,14 @@ export default function ListesPage() {
                     ) : (
                       nonInscritsData!.map((p) => (
                         <tr key={p.email} className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors">
-                          <td className="px-4 py-2.5 text-[#0a0a0a]">{p.email}</td>
+                          <td className="px-4 py-2.5">
+                            <Link
+                              href={`/dashboard/contacts/${encodeURIComponent(p.email)}`}
+                              className="text-[#0a0a0a] hover:underline cursor-pointer"
+                            >
+                              {p.email}
+                            </Link>
+                          </td>
                           <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
                           <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
                         </tr>
@@ -702,7 +710,14 @@ export default function ListesPage() {
                     ) : (
                       prospectsData!.map((p) => (
                         <tr key={p.email} className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors">
-                          <td className="px-4 py-2.5 text-[#0a0a0a]">{p.email}</td>
+                          <td className="px-4 py-2.5">
+                            <Link
+                              href={`/dashboard/contacts/${encodeURIComponent(p.email)}`}
+                              className="text-[#0a0a0a] hover:underline cursor-pointer"
+                            >
+                              {p.email}
+                            </Link>
+                          </td>
                           <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
                           <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
                         </tr>
