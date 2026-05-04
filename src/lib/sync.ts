@@ -129,8 +129,9 @@ export async function getContactClickThemes(email: string): Promise<ContactClick
     const name = await fetchCampaignName(campaignId, token)
     if (!name) continue
 
-    const { theme } = parseEmailName(name)
+    const { theme, kind } = parseEmailName(name)
     if (!theme || theme === 'Sans thème' || theme === 'Newsletter') continue
+    if (kind === 'commercial' || kind === 'webinaire') continue
 
     const existing = themeMap.get(theme)
     if (existing) {

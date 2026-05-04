@@ -26,6 +26,7 @@ export interface ParsedCampaignName {
   envoi: number | null
   periode: string | null
   subType: SubType
+  kind: 'dpc' | 'webinaire' | 'newsletter' | 'commercial' | 'unknown'
 }
 
 export interface HubSpotCampaignRaw {
@@ -172,6 +173,53 @@ function detectAudiencesFromName(name: string): string[] {
   return found.length > 0 ? found : ['AUTRE']
 }
 
+// ─── Theme normalization ──────────────────────────────────────────────────────
+
+const COMMERCIAL_PATTERNS: RegExp[] = [
+  /black\s*friday/i,
+  /flash\s*sales?/i,
+  /saint.?valentin/i,
+  /\boffre\b/i,
+  /fin\s+d.ann[eé]e/i,
+  /budget/i,
+  /confirmation/i,
+  /ouverture\s+budget/i,
+]
+
+function isCommercial(rawName: string): boolean {
+  return COMMERCIAL_PATTERNS.some((re) => re.test(rawName))
+}
+
+/**
+ * Nettoyage agressif du nom de thème : strip préfixes (dates, RM, Suivi, DPC),
+ * strip suffixes (envoi, Cloner, Variation, Relance), normalise whitespace.
+ * À appliquer en sortie de chaque branche de parseEmailName.
+ */
+export function normalizeTheme(raw: string): string {
+  let s = raw
+
+  // ── Strip préfixes ──────────────────────────────────────────────────────
+  s = s.replace(/^\d{4,8}[\s_]+/, '')
+  s = s.replace(/^Suivi[\s-]+/i, '')
+  s = s.replace(/^(?:EL|CV|PRES)[/\s-]+(?:MG|CD|MK|SF|PSY|PED|GYN|PLURIPRO)?[\s-]*/i, '')
+  s = s.replace(/^RM\s*\d+\s*[-—]\s*/i, '')
+  s = s.replace(/^(?:Primo\s+inscrits|Version\s+\w+)\s*[-:]\s*/i, '')
+
+  // ── Strip suffixes ──────────────────────────────────────────────────────
+  s = s.replace(/\(\s*\d+\s*[eè](?:me|re|r)?\s+envoi[^)]*\)/gi, '')
+  s = s.replace(/\(\s*[Cc]loner?\s*\)/g, '')
+  s = s.replace(/\(\s*[Cc]op(?:y|ie)\s*\)/g, '')
+  s = s.replace(/\(\s*[Vv]ariation\s*\)/g, '')
+  s = s.replace(/\b[Rr]elance\s*$/, '')
+  s = s.replace(/\(\s*$/, '')          // parenthèse orpheline en fin
+  s = s.replace(/\s*[-—]\s*$/, '')     // tiret orphelin en fin
+
+  // ── Normalisation finale ────────────────────────────────────────────────
+  s = s.replace(/\s+/g, ' ').trim()
+  if (s.length === 0) return ''
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 // ─── parseEmailName ───────────────────────────────────────────────────────────
 
 /**
@@ -188,11 +236,29 @@ function detectAudiencesFromName(name: string): string[] {
  *
  * Pattern 4 — Autres / non reconnus:
  *   AAAAMM_NOM ou format libre
+ *
+ * Le `kind` retourné permet à sync.ts de filtrer les campagnes hors-DPC.
  */
 export function parseEmailName(name: string): ParsedCampaignName {
   const trimmed = name.trim()
 
-  // ── Pattern 2 — Webinaire ────────────────────────────────────────────────
+  // ── Commercial check (priorité maximale, override les autres patterns) ──
+  if (isCommercial(trimmed)) {
+    return {
+      type: 'AUTRE',
+      audiences: detectAudiencesFromName(trimmed),
+      qualifier: null,
+      edition: null,
+      theme: normalizeTheme(trimmed),
+      isABTest: false,
+      envoi: null,
+      periode: null,
+      subType: null,
+      kind: 'commercial',
+    }
+  }
+
+  // ── Pattern 2 — Webinaire DPC (avec ·) ──────────────────────────────────
   if (/webinaire/i.test(trimmed) && trimmed.includes('·')) {
     const parts = trimmed.split('·').map((p) => p.trim())
     // parts[0] = "2603_Webinaire" | "Webinaire", parts[1] = theme, parts[2] = sous-type
@@ -205,9 +271,7 @@ export function parseEmailName(name: string): ParsedCampaignName {
     else if (rawSubType.includes('j-2')) subType = 'j-2'
     else if (rawSubType.includes('replay')) subType = 'replay'
 
-    const theme = rawTheme
-      ? rawTheme.charAt(0).toUpperCase() + rawTheme.slice(1)
-      : 'Webinaire'
+    const theme = rawTheme ? normalizeTheme(rawTheme) : 'Webinaire'
 
     return {
       type: 'WEBINAIRE',
@@ -219,10 +283,11 @@ export function parseEmailName(name: string): ParsedCampaignName {
       envoi: null,
       periode: null,
       subType,
+      kind: 'dpc',
     }
   }
 
-  // ── Pattern 3 — Newsletter ───────────────────────────────────────────────
+  // ── Pattern 3 — Newsletter ──────────────────────────────────────────────
   if (/^newsletter/i.test(trimmed)) {
     // "Newsletter #21 · 260308 · CD" — audience is the last ·-segment
     const parts = trimmed.split('·').map((p) => p.trim())
@@ -242,10 +307,11 @@ export function parseEmailName(name: string): ParsedCampaignName {
       envoi: null,
       periode: null,
       subType: null,
+      kind: 'newsletter',
     }
   }
 
-  // ── Pattern 1 — DPC/Formations (CV | PRES | EL) ──────────────────────────
+  // ── Pattern 1 — DPC/Formations (CV | PRES | EL) ─────────────────────────
   const isDPC = /^(?:\(A\)\s*)?(?:CV|PRES|EL)\s*-/i.test(trimmed)
 
   if (isDPC) {
@@ -306,21 +372,20 @@ export function parseEmailName(name: string): ParsedCampaignName {
         const themeFromEdition = editionMatch[2] ?? null
         const afterEdition = remaining.slice(1).join(' - ')
         const raw = themeFromEdition ?? afterEdition
-        theme = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Sans thème'
+        theme = raw ? normalizeTheme(raw) : 'Sans thème'
       } else {
         const raw = remaining.join(' - ')
-        theme = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Sans thème'
+        theme = raw ? normalizeTheme(raw) : 'Sans thème'
       }
     }
 
-    return { type, audiences, qualifier, edition, theme, isABTest, envoi, periode, subType: null }
+    return { type, audiences, qualifier, edition, theme, isABTest, envoi, periode, subType: null, kind: 'dpc' }
   }
 
-  // ── Pattern 4 — Autre ────────────────────────────────────────────────────
-  // Remove AAAAMM_ prefix if present, replace underscores with spaces
-  const withoutPrefix = trimmed.replace(/^\d{4}_/, '')
-  const raw = withoutPrefix.replace(/_/g, ' ').trim()
-  const theme = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : trimmed
+  // ── Pattern 4 — Autre (fallback) ────────────────────────────────────────
+  const raw = trimmed.replace(/_/g, ' ').trim()
+  const theme = raw ? normalizeTheme(raw) : trimmed
+  const isWebinaire = /webinaire/i.test(trimmed)
 
   return {
     type: 'AUTRE',
@@ -332,6 +397,7 @@ export function parseEmailName(name: string): ParsedCampaignName {
     envoi: null,
     periode: null,
     subType: null,
+    kind: isWebinaire ? 'webinaire' : 'unknown',
   }
 }
 

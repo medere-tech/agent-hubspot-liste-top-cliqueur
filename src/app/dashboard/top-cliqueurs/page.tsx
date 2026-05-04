@@ -207,8 +207,8 @@ export default function TopCliqueurs() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Top cliqueurs</h1>
-          <p className="text-sm text-[#737373] mt-0.5">Croisement HubSpot × Airtable — top 100 contacts</p>
+          <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Top cliqueurs HubSpot (lifetime)</h1>
+          <p className="text-sm text-[#737373] mt-0.5">Croisement HubSpot × Airtable — top 100 contacts. Vue brute HubSpot — pour les contacts qualifiés par thème, voir Thématiques et Listes.</p>
         </div>
 
         {/* Export CSV */}
