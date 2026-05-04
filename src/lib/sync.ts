@@ -23,6 +23,7 @@ export interface ContactClickThemes {
 export interface SyncResult {
   synced: number
   errors: number
+  skippedNoTheme: number
   duration: number // ms
   startOffset: number
   endOffset: number
@@ -216,6 +217,7 @@ export async function syncAllTopClickers(
     return {
       synced: 0,
       errors: 0,
+      skippedNoTheme: 0,
       duration: Date.now() - start,
       startOffset: 0,
       endOffset: 0,
@@ -259,6 +261,7 @@ export async function syncAllTopClickers(
       return {
         synced: 0,
         errors: 0,
+        skippedNoTheme: 0,
         duration: Date.now() - start,
         startOffset,
         endOffset: 0,
@@ -285,6 +288,7 @@ export async function syncAllTopClickers(
     // ── 5. Process contact ───────────────────────────────────────────────
     let synced = 0
     let errors = 0
+    let skippedNoTheme = 0
 
     for (let i = 0; i < clickers.length; i++) {
       const contact = clickers[i]
@@ -292,37 +296,48 @@ export async function syncAllTopClickers(
 
       try {
         const clickThemes = await getContactClickThemes(contact.emailAddress)
-        const inscriptions = inscriptionsMap.get(contact.emailAddress.toLowerCase()) ?? []
-        const isInscrit = inscriptions.length > 0
 
-        const row = {
-          email:          contact.emailAddress.toLowerCase(),
-          contact_id:     String(contact.contactId),
-          total_clicks:   contact.totalClicks,
-          themes:         clickThemes.themes,
-          is_inscrit:     isInscrit,
-          inscriptions:   inscriptions.map((ins) => ({
-            nomFormation: ins.nomFormation,
-            specialite:   ins.specialite,
-            dateCreation: ins.dateCreation,
-          })),
-          last_synced_at: new Date().toISOString(),
+        // Skip si aucun thème ≥3 clics. Pas d'upsert : on ne crée pas de ligne
+        // vide qui encombrerait la table et fausserait les comptages.
+        // (Si la ligne existe déjà avec d'anciens thèmes, on ne la touche pas —
+        //  un cleanup SQL séparé s'en chargera si besoin.)
+        if (clickThemes.themes.length === 0) {
+          skippedNoTheme++
+          onProgress?.(`  → SKIP — aucun thème ≥3 clics`)
+        } else {
+          const inscriptions = inscriptionsMap.get(contact.emailAddress.toLowerCase()) ?? []
+          const isInscrit = inscriptions.length > 0
+
+          const row = {
+            email:          contact.emailAddress.toLowerCase(),
+            contact_id:     String(contact.contactId),
+            total_clicks:   contact.totalClicks,
+            themes:         clickThemes.themes,
+            is_inscrit:     isInscrit,
+            inscriptions:   inscriptions.map((ins) => ({
+              nomFormation: ins.nomFormation,
+              specialite:   ins.specialite,
+              dateCreation: ins.dateCreation,
+            })),
+            last_synced_at: new Date().toISOString(),
+          }
+
+          const { error } = await supabase
+            .from('contact_click_themes')
+            .upsert(row, { onConflict: 'email' })
+
+          if (error) throw new Error(error.message)
+
+          synced++
+          onProgress?.(`  → OK — ${clickThemes.themes.length} thème(s) — inscrit=${isInscrit}`)
         }
-
-        const { error } = await supabase
-          .from('contact_click_themes')
-          .upsert(row, { onConflict: 'email' })
-
-        if (error) throw new Error(error.message)
-
-        synced++
-        onProgress?.(`  → OK — ${clickThemes.themes.length} thème(s) — inscrit=${isInscrit}`)
       } catch (err) {
         errors++
         onProgress?.(`  → ERREUR — ${err instanceof Error ? err.message : String(err)}`)
       }
 
-      // 150ms between contacts to stay under HubSpot v1 rate limit (100 req/10s)
+      // 150ms entre contacts — s'applique aussi sur SKIP (on a fait l'appel
+      // HubSpot events) et sur ERREUR.
       if (i < clickers.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 150))
       }
@@ -352,12 +367,13 @@ export async function syncAllTopClickers(
     const duration = Date.now() - start
     if (fullCycle) onProgress?.(`[sync] Cycle complet terminé — reset cursor à 0`)
     onProgress?.(
-      `[sync] Terminé — ${synced} synced, ${errors} errors, ${(duration / 1000).toFixed(1)}s`
+      `[sync] Terminé — ${synced} synced, ${skippedNoTheme} skipped, ${errors} errors, ${(duration / 1000).toFixed(1)}s`
     )
 
     return {
       synced,
       errors,
+      skippedNoTheme,
       duration,
       startOffset,
       endOffset: cursorUpdate.current_offset,
