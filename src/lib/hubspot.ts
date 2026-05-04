@@ -191,8 +191,107 @@ function isCommercial(rawName: string): boolean {
 }
 
 /**
+ * Mapping de dédoublonnage des variantes HubSpot vers un nom canonique.
+ * Clés en lowercase. Lookup : THEME_ALIASES[result.toLowerCase()] ?? result.
+ * Le fallback (?? result) garde le thème tel quel si non mappé — pas de perte.
+ */
+const THEME_ALIASES: Record<string, string> = {
+  // Endocrinien
+  'perturbateur endo':              'Perturbateurs endocriniens',
+  'perturbateurs endo':             'Perturbateurs endocriniens',
+  'perturbateurs endocriniens':     'Perturbateurs endocriniens',
+
+  // Sommeil
+  'sommeil':                        'Troubles du sommeil',
+  'troubles du sommeil':            'Troubles du sommeil',
+
+  // Neuro / TDAH
+  'tdah':                           'TDAH',
+  'neurodéveloppement':             'TDAH',
+  'trouble du neurodéveloppement':  'TDAH',
+
+  // Cardio
+  'hta':                            'Hypertension artérielle',
+  'hypertension artérielle':        'Hypertension artérielle',
+  'ecg':                            'Électrocardiogramme',
+  'électrocardiogramme':            'Électrocardiogramme',
+  'electrocardiogramme':            'Électrocardiogramme',
+
+  // Diabète (variantes type 2 explicite uniquement — pas de mapping racine)
+  'diabète de type 2':              'Diabète de type 2',
+  'diabète de type ii':             'Diabète de type 2',
+
+  // Dermato
+  'dermatoscopie':                  'Dermoscopie',
+  'dermoscopie':                    'Dermoscopie',
+  'cancers cutanés':                'Cancers cutanés',
+  'red flags en dermatologie':      'Red flags dermatologie',
+
+  // Endométriose
+  'endométriose':                   'Endométriose',
+
+  // IST
+  'ist':                            'IST',
+  'infections sexuellement transmissibles': 'IST',
+
+  // Pédiatrie / Sage-femme
+  'pathologies de l\'épaule':       'Pathologies de l\'épaule',
+
+  // Addictions (pas de mapping racine — 'Addictions' reste distinct)
+  'cannabis':                       'Cannabis',
+  'addictions et santé mentale':    'Addictions et santé mentale',
+
+  // Psychiatrie
+  'bipolaires':                     'Troubles bipolaires',
+  'troubles bipolaires':            'Troubles bipolaires',
+  'burn out':                       'Burn out',
+  'burnout':                        'Burn out',
+  'épuisement professionnel':       'Burn out',
+
+  // Mode de vie
+  'méditation':                     'Méditation pleine conscience',
+  'méditation de pleine conscience': 'Méditation pleine conscience',
+  'covid long':                     'COVID long',
+
+  // Vaccination
+  'vaccination':                    'Vaccination',
+
+  // Parkinson
+  'parkinson':                      'Maladie de Parkinson',
+  'maladie de parkinson':           'Maladie de Parkinson',
+
+  // Dentaire
+  'cone beam ct':                   'Cone Beam CT',
+  'cbct':                           'Cone Beam CT',
+  'implantologie':                  'Implantologie',
+  'inlays':                         'Inlays / Onlays',
+  'onlays':                         'Inlays / Onlays',
+  'inlays / onlays':                'Inlays / Onlays',
+  'inlays / onlays / overlays':     'Inlays / Onlays',
+  'bruxisme':                       'Bruxismes',
+  'bruxismes':                      'Bruxismes',
+  'maladies parodontales':          'Maladies parodontales',
+  'prothèses amovibles complètes':  'Prothèses Amovibles Complètes',
+  'dermatologie buccale':           'Dermatologie buccale',
+  'retraitement endodontique':      'Endodontie',
+  'endodontie':                     'Endodontie',
+
+  // Métier
+  'téléconsultation':               'Téléconsultation',
+
+  // Cotation (formation interne, pas dans Airtable)
+  'cotation mg 2026':               'Cotation MG 2026',
+
+  // Plaies / soins infirmiers
+  'bilan de plaie':                 'Bilan de plaies',
+  'bilan de plaies':                'Bilan de plaies',
+  'bilan de soins infirmiers':      'Bilan de soins infirmiers',
+}
+
+/**
  * Nettoyage agressif du nom de thème : strip préfixes (dates, RM, Suivi, DPC),
- * strip suffixes (envoi, Cloner, Variation, Relance), normalise whitespace.
+ * strip suffixes (envoi, Cloner, Variation, Relance), normalise whitespace,
+ * puis lookup dans THEME_ALIASES pour dédoublonner les variantes connues.
  * À appliquer en sortie de chaque branche de parseEmailName.
  */
 export function normalizeTheme(raw: string): string {
@@ -217,7 +316,10 @@ export function normalizeTheme(raw: string): string {
   // ── Normalisation finale ────────────────────────────────────────────────
   s = s.replace(/\s+/g, ' ').trim()
   if (s.length === 0) return ''
-  return s.charAt(0).toUpperCase() + s.slice(1)
+  const capitalized = s.charAt(0).toUpperCase() + s.slice(1)
+
+  // ── Lookup alias (dédoublonnage variantes connues) ──────────────────────
+  return THEME_ALIASES[capitalized.toLowerCase()] ?? capitalized
 }
 
 // ─── parseEmailName ───────────────────────────────────────────────────────────
