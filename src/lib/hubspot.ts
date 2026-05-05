@@ -199,6 +199,18 @@ function isCommercial(rawName: string): boolean {
 }
 
 /**
+ * Patterns de "garbage" appliqués au thème déjà normalisé (post-alias).
+ * Capture les motifs qui survivent au pipeline DPC quand ils apparaissent
+ * comme segment intermédiaire (ex. "CV - MG - Rappel J-23 - Sommeil"),
+ * où isCommercial est inopérant car ancré sur le rawName complet.
+ */
+const GARBAGE_PATTERNS: RegExp[] = [
+  /^Rappel\s+J[+-]?\d+/i,
+  /^\d+\s+formations?/i,
+  /^\(\d+\s+formations?\)/i,
+]
+
+/**
  * Mapping de dédoublonnage des variantes HubSpot vers un nom canonique.
  * Clés en lowercase. Lookup : THEME_ALIASES[result.toLowerCase()] ?? result.
  * Le fallback (?? result) garde le thème tel quel si non mappé — pas de perte.
@@ -339,7 +351,15 @@ export function normalizeTheme(raw: string): string {
   const capitalized = s.charAt(0).toUpperCase() + s.slice(1)
 
   // ── Lookup alias (dédoublonnage variantes connues) ──────────────────────
-  return THEME_ALIASES[capitalized.toLowerCase()] ?? capitalized
+  const result = THEME_ALIASES[capitalized.toLowerCase()] ?? capitalized
+
+  // ── Filtre garbage post-normalisation ───────────────────────────────────
+  // Élimine les segments parasites qui survivent au pipeline DPC
+  // (ex. "Rappel J-23", "3 formations") quand ils apparaissent au milieu
+  // d'un nom de campagne — isCommercial est ancré ^ et ne les voit pas.
+  if (GARBAGE_PATTERNS.some((re) => re.test(result))) return ''
+
+  return result
 }
 
 // ─── parseEmailName ───────────────────────────────────────────────────────────
