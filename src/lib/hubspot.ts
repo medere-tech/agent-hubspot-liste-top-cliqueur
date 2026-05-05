@@ -184,6 +184,14 @@ const COMMERCIAL_PATTERNS: RegExp[] = [
   /budget/i,
   /confirmation/i,
   /ouverture\s+budget/i,
+  // Lead magnets / engagement commercial / offres groupées
+  /livre\s*blanc/i,
+  /^quizz?\s/i,
+  /^\d+\s+formations?/i,
+  /^\(\d+\s+formations?\)/i,
+  /^dangers$/i,
+  // Rappels marketing (J-2, J-8, J-23…) — pas des formations
+  /^Rappel\s+J[+-]?\d+/i,
 ]
 
 function isCommercial(rawName: string): boolean {
@@ -198,12 +206,16 @@ function isCommercial(rawName: string): boolean {
 const THEME_ALIASES: Record<string, string> = {
   // Endocrinien
   'perturbateur endo':              'Perturbateurs endocriniens',
+  'perturbateur endocr':            'Perturbateurs endocriniens',
+  'perturbateur endocr.':           'Perturbateurs endocriniens',
   'perturbateurs endo':             'Perturbateurs endocriniens',
   'perturbateurs endocriniens':     'Perturbateurs endocriniens',
 
   // Sommeil
   'sommeil':                        'Troubles du sommeil',
   'troubles du sommeil':            'Troubles du sommeil',
+  'sommeil de l\'enfant':           'Troubles du sommeil de l\'enfant',
+  'troubles du sommeil de l\'enfant': 'Troubles du sommeil de l\'enfant',
 
   // Neuro / TDAH
   'tdah':                           'TDAH',
@@ -240,6 +252,8 @@ const THEME_ALIASES: Record<string, string> = {
   // Addictions (pas de mapping racine — 'Addictions' reste distinct)
   'cannabis':                       'Cannabis',
   'addictions et santé mentale':    'Addictions et santé mentale',
+  'chemsex':                        'Addiction/chemsex',
+  'addiction/chemsex':              'Addiction/chemsex',
 
   // Psychiatrie
   'bipolaires':                     'Troubles bipolaires',
@@ -301,7 +315,13 @@ export function normalizeTheme(raw: string): string {
   s = s.replace(/^\d{4,8}[\s_]+/, '')
   s = s.replace(/^Suivi[\s-]+/i, '')
   s = s.replace(/^(?:EL|CV|PRES)[/\s-]+(?:MG|CD|MK|SF|PSY|PED|GYN|PLURIPRO)?[\s-]*/i, '')
+  // Rappel d'édition (RM6 RAPPEL J-2…) — pas un thème, vide → "Sans thème"
+  if (/^RM\s*\d+\s+RAPPEL\b/i.test(s)) return ''
+  // Synthèse d'édition (RM6 SYNTHESE Troubles bipolaires) — strip le préfixe
+  s = s.replace(/^RM\s*\d+\s+SYNTH[ÈE]SE\s+/i, '')
   s = s.replace(/^RM\s*\d+\s*[-—]\s*/i, '')
+  // RM\d+ orphelin sans thème (PRES - CD - RM 6) → vide → "Sans thème"
+  s = s.replace(/^RM\s*\d+\s*$/i, '')
   s = s.replace(/^(?:Primo\s+inscrits|Version\s+\w+)\s*[-:]\s*/i, '')
 
   // ── Strip suffixes ──────────────────────────────────────────────────────
@@ -468,16 +488,16 @@ export function parseEmailName(name: string): ParsedCampaignName {
 
     if (remaining.length > 0) {
       // Edition can be "RM7" alone or "RM8 (Agressivité)" — theme in parens
-      const editionMatch = remaining[0].match(/^(RM\d+)(?:\s+\(([^)]+)\))?$/)
+      const editionMatch = remaining[0].match(/^(RM\s*\d+)(?:\s+\(([^)]+)\))?$/)
       if (editionMatch) {
-        edition = editionMatch[1]
+        edition = editionMatch[1].replace(/\s+/g, '')
         const themeFromEdition = editionMatch[2] ?? null
         const afterEdition = remaining.slice(1).join(' - ')
         const raw = themeFromEdition ?? afterEdition
-        theme = raw ? normalizeTheme(raw) : 'Sans thème'
+        theme = raw ? (normalizeTheme(raw) || 'Sans thème') : 'Sans thème'
       } else {
         const raw = remaining.join(' - ')
-        theme = raw ? normalizeTheme(raw) : 'Sans thème'
+        theme = raw ? (normalizeTheme(raw) || 'Sans thème') : 'Sans thème'
       }
     }
 
