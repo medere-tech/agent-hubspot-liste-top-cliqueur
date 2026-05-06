@@ -303,8 +303,17 @@ export async function syncAllTopClickers(
         // (Si la ligne existe déjà avec d'anciens thèmes, on ne la touche pas —
         //  un cleanup SQL séparé s'en chargera si besoin.)
         if (clickThemes.themes.length === 0) {
+          // Supprimer la ligne existante si elle existe (données fossilisées d'une ancienne version du code)
+          const { error: delErr } = await supabase
+            .from('contact_click_themes')
+            .delete()
+            .eq('email', contact.emailAddress.toLowerCase())
+          if (delErr) {
+            onProgress?.(`  → SKIP — aucun thème ≥3 clics (delete failed: ${delErr.message})`)
+          } else {
+            onProgress?.(`  → CLEAN — aucun thème ≥3 clics, ligne supprimée`)
+          }
           skippedNoTheme++
-          onProgress?.(`  → SKIP — aucun thème ≥3 clics`)
         } else {
           const inscriptions = inscriptionsMap.get(contact.emailAddress.toLowerCase()) ?? []
           const isInscrit = inscriptions.length > 0
