@@ -10,10 +10,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: 'Mot de passe', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          console.log('[auth] blocked:', { reason: 'missing-credentials' })
-          return null
-        }
+        if (!credentials?.email || !credentials?.password) return null
 
         const supabase = createSupabaseAdmin()
 
@@ -22,43 +19,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: credentials.email as string,
           password: credentials.password as string,
         })
-        console.log('[auth] signIn result:', {
-          userId: data.user?.id,
-          email: data.user?.email,
-          error: error?.message,
-        })
-        if (error || !data.user) {
-          console.log('[auth] blocked:', { reason: 'signin-failed', error: error?.message })
-          return null
-        }
+        if (error || !data.user) return null
 
         // 2. Profil applicatif obligatoire — pas de fallback silencieux.
         //    Un compte auth.users sans profil user_profiles = login refusé.
-        const { data: profile, error: profileError } = await supabase
+        //    Client séparé : le premier est "tainté" par signInWithPassword qui
+        //    bascule le contexte auth vers le JWT utilisateur — les requêtes PostgREST
+        //    suivantes utilisent ce JWT et tombent sur RLS (0 lignes vu qu'aucune
+        //    policy n'autorise authenticated). Un client neuf rebrandit service_role.
+        const supabaseAdmin = createSupabaseAdmin()
+        const { data: profile, error: profileError } = await supabaseAdmin
           .from('user_profiles')
           .select('full_name, role, is_active')
           .eq('id', data.user.id)
           .single()
 
-        console.log('[auth] profile result:', {
-          profile,
-          profileError: profileError?.message,
-        })
-
-        if (profileError || !profile) {
-          console.log('[auth] blocked:', {
-            reason: 'profile-missing',
-            profileError: profileError?.message,
-          })
-          return null
-        }
-        if (!profile.is_active) {
-          console.log('[auth] blocked:', { reason: 'profile-inactive' })
-          return null
-        }
+        if (profileError || !profile) return null
+        if (!profile.is_active) return null
 
         // 3. last_login_at — fire-and-forget : best-effort, ne bloque jamais le login.
-        supabase
+        //    Utilise supabaseAdmin (service_role pure) pour la même raison RLS.
+        supabaseAdmin
           .from('user_profiles')
           .update({ last_login_at: new Date().toISOString() })
           .eq('id', data.user.id)
