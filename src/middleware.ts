@@ -1,11 +1,16 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import type { Session } from 'next-auth'
 
 const PUBLIC_PATHS = ['/login', '/api/auth', '/api/cron']
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+}
+
+function isAdminPath(pathname: string): boolean {
+  return pathname.startsWith('/dashboard/admin') || pathname.startsWith('/api/admin')
 }
 
 // In-memory rate limiter for /api/ routes (resets per cold start)
@@ -30,7 +35,7 @@ function checkRateLimit(ip: string): boolean {
 
 export default auth(async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const session = (req as NextRequest & { auth?: unknown }).auth
+  const session = (req as NextRequest & { auth?: Session | null }).auth ?? null
 
   // Rate limiting on /api/ routes (excluding /api/auth which is handled by NextAuth)
   if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth')) {
@@ -56,6 +61,18 @@ export default auth(async function middleware(req: NextRequest) {
       })
     }
     return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  // Admin guard — exécuté APRÈS le check session, donc session est garantie ici.
+  // Sessions JWT pré-migration (sans role) sont traitées comme non-admin (safe default).
+  if (isAdminPath(pathname) && session?.user?.role !== 'admin') {
+    if (pathname.startsWith('/api/')) {
+      return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   if (pathname === '/login' && session) {

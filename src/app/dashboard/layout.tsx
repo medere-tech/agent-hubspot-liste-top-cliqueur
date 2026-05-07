@@ -10,7 +10,11 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      <Sidebar userEmail={session?.user?.email} />
+      <Sidebar
+        userEmail={session?.user?.email}
+        userName={session?.user?.name}
+        userRole={session?.user?.role}
+      />
       <main className="ml-[240px] min-h-screen">
         {children}
       </main>

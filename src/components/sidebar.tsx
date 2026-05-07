@@ -67,16 +67,59 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
+const ADMIN_ITEMS: NavItem[] = [
+  {
+    label: 'Utilisateurs',
+    href: '/dashboard/admin/users',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M1.5 13c0-2.485 2.015-4 4.5-4s4.5 1.515 4.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <circle cx="11.5" cy="4.5" r="2" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M10.5 9c2 0 4 1 4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+]
+
 interface SidebarProps {
   userEmail: string | null | undefined
+  userName?: string | null
+  userRole?: 'admin' | 'user' | null
 }
 
-export default function Sidebar({ userEmail }: SidebarProps) {
+function isItemActive(pathname: string, href: string): boolean {
+  if (href === '/dashboard') return pathname === '/dashboard'
+  return pathname.startsWith(href)
+}
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-[4px] text-sm transition-colors ${
+        active
+          ? 'bg-[#f5f5f5] text-[#0a0a0a] font-medium'
+          : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a]'
+      }`}
+    >
+      {item.icon}
+      {item.label}
+    </Link>
+  )
+}
+
+export default function Sidebar({ userEmail, userName, userRole }: SidebarProps) {
   const pathname = usePathname()
 
-  const displayName = userEmail
-    ? userEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    : 'Utilisateur'
+  // Préfère le full_name explicite. Fallback : dérivé de l'email.
+  const displayName =
+    (userName && userName.trim()) ||
+    (userEmail
+      ? userEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      : 'Utilisateur')
+
+  const isProfileActive = pathname.startsWith('/dashboard/profile')
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-[240px] bg-white border-r border-[#e5e5e5] flex flex-col z-20">
@@ -92,39 +135,50 @@ export default function Sidebar({ userEmail }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {NAV_ITEMS.map((item) => (
+          <NavLink key={item.href} item={item} active={isItemActive(pathname, item.href)} />
+        ))}
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-[4px] text-sm transition-colors ${
-                isActive
-                  ? 'bg-[#f5f5f5] text-[#0a0a0a] font-medium'
-                  : 'text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a]'
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          )
-        })}
+        {/* Section Administration — visible uniquement pour les admins */}
+        {userRole === 'admin' && (
+          <>
+            <div className="pt-5 pb-1.5 px-3">
+              <span className="text-[10px] font-medium text-[#a3a3a3] tracking-wider uppercase">
+                Administration
+              </span>
+            </div>
+            {ADMIN_ITEMS.map((item) => (
+              <NavLink key={item.href} item={item} active={isItemActive(pathname, item.href)} />
+            ))}
+          </>
+        )}
       </nav>
 
-      {/* User + Logout */}
-      <div className="px-3 pb-4 pt-3 border-t border-[#e5e5e5]">
-        <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
+      {/* User pill (cliquable → /dashboard/profile) + Se déconnecter */}
+      <div className="px-3 pb-4 pt-3 border-t border-[#e5e5e5] space-y-0.5">
+        <Link
+          href="/dashboard/profile"
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-[4px] transition-colors ${
+            isProfileActive
+              ? 'bg-[#f5f5f5]'
+              : 'hover:bg-[#f5f5f5]'
+          }`}
+        >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="7" cy="5" r="2.5" stroke="#a3a3a3" strokeWidth="1.2" />
-            <path d="M1.5 12.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5" stroke="#a3a3a3" strokeWidth="1.2" strokeLinecap="round" />
+            <circle cx="7" cy="5" r="2.5" stroke={isProfileActive ? '#0a0a0a' : '#a3a3a3'} strokeWidth="1.2" />
+            <path d="M1.5 12.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5" stroke={isProfileActive ? '#0a0a0a' : '#a3a3a3'} strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-          <span className="text-xs text-[#737373] truncate">{displayName}</span>
-        </div>
+          <div className="flex-1 min-w-0">
+            <div className={`text-xs truncate ${isProfileActive ? 'text-[#0a0a0a] font-medium' : 'text-[#0a0a0a]'}`}>
+              {displayName}
+            </div>
+            {userEmail && (
+              <div className="text-[10px] text-[#a3a3a3] truncate">{userEmail}</div>
+            )}
+          </div>
+        </Link>
+
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-[4px] text-sm text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a] transition-colors"
