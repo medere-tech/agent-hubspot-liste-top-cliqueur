@@ -199,15 +199,30 @@ function isCommercial(rawName: string): boolean {
 }
 
 /**
- * Patterns de "garbage" appliqués au thème déjà normalisé (post-alias).
+ * Patterns de "garbage" appliqués au thème post-strip, pre-alias.
  * Capture les motifs qui survivent au pipeline DPC quand ils apparaissent
  * comme segment intermédiaire (ex. "CV - MG - Rappel J-23 - Sommeil"),
  * où isCommercial est inopérant car ancré sur le rawName complet.
+ *
+ * Positionnement : APRÈS le strip des préfixes mais AVANT le lookup THEME_ALIASES.
+ * Conséquence : si le strip a déjà nettoyé un préfixe DPC (ex. "CV - MG -"),
+ * le pattern ^CV\s*- ne se déclenche pas inutilement sur le thème propre.
+ * Sécurité résiduelle : si le strip n'a pas fait son job (input pathologique,
+ * audience non whitelistée, etc.), GARBAGE rattrape.
  */
 const GARBAGE_PATTERNS: RegExp[] = [
   /^Rappel\s+J[+-]?\d+/i,
   /^\d+\s+formations?/i,
   /^\(\d+\s+formations?\)/i,
+  // Préfixes DPC résiduels (strip a échoué)
+  /^CV\s*-/i,
+  /^PRES\s*-/i,
+  /^EL\s*-/i,
+  // Préfixe Version non strippé (ex. "Version New Gen CV - CD - …")
+  /^Version\s/i,
+  // Marketing commercial qui slip à travers isCommercial
+  /^Quizz?\s/i,
+  /^Dangers$/i,
 ]
 
 /**
@@ -350,16 +365,16 @@ export function normalizeTheme(raw: string): string {
   if (s.length === 0) return ''
   const capitalized = s.charAt(0).toUpperCase() + s.slice(1)
 
-  // ── Lookup alias (dédoublonnage variantes connues) ──────────────────────
-  const result = THEME_ALIASES[capitalized.toLowerCase()] ?? capitalized
-
-  // ── Filtre garbage post-normalisation ───────────────────────────────────
+  // ── Filtre garbage (pre-alias) ──────────────────────────────────────────
   // Élimine les segments parasites qui survivent au pipeline DPC
-  // (ex. "Rappel J-23", "3 formations") quand ils apparaissent au milieu
-  // d'un nom de campagne — isCommercial est ancré ^ et ne les voit pas.
-  if (GARBAGE_PATTERNS.some((re) => re.test(result))) return ''
+  // (ex. "Rappel J-23", "3 formations", "CV - MG -" résiduel) quand ils
+  // apparaissent au milieu d'un nom de campagne — isCommercial est ancré ^
+  // sur le rawName complet et ne les voit pas. Filet de sûreté quand le
+  // strip de préfixes a échoué.
+  if (GARBAGE_PATTERNS.some((re) => re.test(capitalized))) return ''
 
-  return result
+  // ── Lookup alias (dédoublonnage variantes connues) ──────────────────────
+  return THEME_ALIASES[capitalized.toLowerCase()] ?? capitalized
 }
 
 // ─── parseEmailName ───────────────────────────────────────────────────────────
