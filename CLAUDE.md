@@ -109,8 +109,13 @@ CREATE TABLE public.contact_click_themes (
   themes          JSONB NOT NULL DEFAULT '[]',
   is_inscrit      BOOLEAN NOT NULL DEFAULT FALSE,
   inscriptions    JSONB NOT NULL DEFAULT '[]',
+  eligible_dpc    TEXT,            -- "true" | "false" | NULL (cf. section Éligibilité DPC)
   last_synced_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Index partiel pour le filtre eligible_dpc (NULL exclus)
+CREATE INDEX idx_contact_click_themes_eligible_dpc
+  ON public.contact_click_themes (eligible_dpc)
+  WHERE eligible_dpc IS NOT NULL;
 ```
 
 Structure des champs JSONB :
@@ -227,6 +232,7 @@ Les emails HubSpot suivent ce pattern :
 | Gestion utilisateurs (table user_profiles + CRUD admin) | `app/api/admin/users/*`, `app/dashboard/admin/users/` |
 | Changement mot de passe self-service | `app/api/profile/password/`, `app/dashboard/profile/` |
 | Augmentation types NextAuth (role + name) | `types/next-auth.d.ts` |
+| Filtre éligibilité DPC (sync + routes + UI + export) | `lib/hubspot.ts`, `lib/sync.ts`, `app/api/contacts/*`, `app/dashboard/listes/`, `app/dashboard/export/` |
 
 ### Post-MVP (ne pas implémenter maintenant)
 
@@ -349,6 +355,50 @@ Admins initiaux : `arnaud@medere.fr` + `dethie@medere.fr` (mêmes droits). Créa
 - **Page** `/dashboard/export` : 3 sections — Thématiques (tableau agrégé), Non inscrits, Inscrits
 - **Utilitaire** `src/lib/csv.ts` : centralise le format (BOM UTF-8 pour Excel FR, séparateur `;`, fin de ligne CRLF)
 - Top cliqueurs refactoré pour utiliser le même utilitaire — un seul endroit où le format peut diverger
+- Inscrits et non inscrits incluent la colonne **Eligible DPC** (Oui / Non / vide) — cf. section Éligibilité DPC
+
+## Éligibilité DPC
+
+Permet à Arnaud de filtrer les contacts selon la qualification commerciale `Eligible DPC` saisie manuellement dans HubSpot (oui/non, ou non renseigné).
+
+### Propriété HubSpot
+
+- **Nom technique** : `eligible_dpc`
+- **Type** : `enumeration` — valeurs `"true"` (label "Oui") / `"false"` (label "Non") / `null` (non renseignée)
+- **Renseignement** : manuel par les commerciaux après le premier appel de qualification
+- **Propriétés connexes disponibles mais non utilisées** : `hors_zone_dpc` (enum Oui/Non), `cause_de_non_eligibilite` (enum : Hospitalier ANFH, Etudiant, Retraité, Décédé, Remplaçant, Paramédical, Étranger, Secteur 3, Assistant dentaire, MK, IDE)
+
+### Stockage Supabase
+
+Colonne `contact_click_themes.eligible_dpc TEXT` (nullable). Index partiel `WHERE eligible_dpc IS NOT NULL` — la majorité des lignes restent `NULL` au début (pas de backfill) donc l'index ne couvre que ce qui est utile.
+
+### Sync
+
+`getTopClickers` (`lib/hubspot.ts`) inclut `eligible_dpc` dans les properties demandées au CRM v3 search. Normalisation à la sortie : `null` si absent/vide, sinon valeur brute (`"true"` ou `"false"`). Stocké à l'upsert dans `sync.ts`.
+
+### Routes API
+
+`/api/contacts/by-theme` et `/api/contacts/inscrits` acceptent un paramètre query optionnel `?eligible_dpc=true|false`. Toute autre valeur est ignorée silencieusement (validation stricte). Quand le paramètre est présent, le filtre `.eq('eligible_dpc', value)` est appliqué **côté Supabase au query** (pas en mémoire) — réduit drastiquement la fenêtre transférée. Le 3ème paramètre devient une clé de cache `unstable_cache` (3 variantes max : `'true'`, `'false'`, `undefined`).
+
+Le champ `eligibleDpc: string | null` est renvoyé dans chaque prospect ET dans la racine de la réponse.
+
+### UI page Listes
+
+Composant `DpcFilter` (dropdown 3 options : Tous / Éligibles DPC / Non éligibles DPC) affiché pour les modes `inscrits` et `non_inscrits`. **Pas de filtre** en mode `prospects_chauds` (URL-driven, non supporté). État `string` géré par-source (`inscritsEligibleDpc`, `nonInscritsEligibleDpc`).
+
+`PreviewTable` affiche la colonne "DPC" dans tous les modes (Oui / Non / —).
+
+### Export CSV
+
+Colonne "Eligible DPC" insérée dans les exports inscrits et non inscrits (avant Thèmes/Formations). Valeurs : `"Oui"` / `"Non"` / `""` (vide si NULL). Helper local `formatDpc()`.
+
+### Fraîcheur — pas de backfill
+
+Les ~10 000 contacts existants gardent `eligible_dpc = NULL` jusqu'à leur passage dans le cron (worst case ~67j). Décision validée : la propriété évolue lentement côté commerciaux, et un délai de quelques semaines avant qu'elle ne se reflète dans les listes est acceptable.
+
+### Effet de bord du filtre
+
+`uniqueThemes` retourné par les routes ne contient que les thèmes des contacts filtrés. Si l'utilisateur a sélectionné un thème puis active le filtre DPC, il peut se retrouver avec un thème qui n'a plus de contacts éligibles → message "Aucun X n'a cliqué sur ce thème". Acceptable, pas de reset automatique du dropdown.
 
 ## Décisions techniques
 
