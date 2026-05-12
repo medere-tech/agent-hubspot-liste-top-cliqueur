@@ -33,6 +33,12 @@ src/
     api/
       auth/[...nextauth]/         # Auth NextAuth
       cron/sync-contacts/         # Cron Vercel — sync paginée 1x/jour à 1h UTC
+      admin/
+        users/                    # GET liste / POST création
+        users/[id]/               # PATCH update (role, is_active, email, full_name)
+        users/[id]/reset-password # POST reset par un admin
+      profile/
+        password/                 # POST changement de son propre mot de passe
       contacts/
         [email]/                  # GET fiche contact (Supabase + HubSpot enrichment)
         by-theme/                 # GET non-inscrits avec thèmes (filtre theme optionnel)
@@ -50,16 +56,21 @@ src/
       listes/page.tsx             # Création et gestion des listes HubSpot
       contacts/[email]/page.tsx   # Fiche détail contact (thèmes, clics, inscriptions)
       export/page.tsx             # Export CSV
+      admin/users/page.tsx        # Gestion utilisateurs (admin only)
+      profile/                    # Profil utilisateur (server + client form)
       layout.tsx                  # Layout dashboard avec sidebar
   lib/
-    auth.ts                       # Config NextAuth
-    hubspot.ts                    # Client HubSpot (getTopClickers, parseEmailName)
+    auth.ts                       # Config NextAuth (authorize + JWT/Session callbacks)
+    hubspot.ts                    # Client HubSpot (parseEmailName, normalizeTheme, isCommercial)
     airtable.ts                   # Client Airtable (inscriptions)
     supabase.ts                   # Client Supabase admin (service_role)
     sync.ts                       # Pipeline sync HubSpot → Supabase
+    csv.ts                        # Utilitaire CSV partagé (BOM UTF-8, ;, CRLF)
   components/
-    sidebar.tsx                   # Navigation latérale
-  middleware.ts                   # Protection des routes
+    sidebar.tsx                   # Navigation latérale (lien Admin conditionnel)
+  types/
+    next-auth.d.ts                # Augmentation User/Session/JWT (role + name)
+  middleware.ts                   # Protection des routes (session + guard admin)
 vercel.json                       # Config cron Vercel
 ```
 
@@ -118,6 +129,27 @@ NOTIFY pgrst, 'reload schema';
 ```
 Sans ça, PostgREST retourne `PGRST205 — Could not find the table in the schema cache`.
 
+### Table `user_profiles` (gestion des accès)
+
+```sql
+CREATE TABLE public.user_profiles (
+  id            UUID         PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email         TEXT         NOT NULL UNIQUE,
+  full_name     TEXT         NOT NULL,
+  role          TEXT         NOT NULL DEFAULT 'user',
+  is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ,
+  CONSTRAINT user_profiles_role_check
+    CHECK (role IN ('admin', 'user')),
+  CONSTRAINT user_profiles_email_medere_only
+    CHECK (email ~* '^[^@\s]+@medere\.fr$')
+);
+ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+```
+
+RLS activée **sans policy** → seul le `service_role` (BYPASSRLS) accède. L'app passe par `createSupabaseAdmin()` côté serveur uniquement. Bootstrap : `arnaud@medere.fr` + `dethie@medere.fr` (admins).
+
 ## Structure Airtable
 
 **Table** : `tblTOJHEwCQhibcMM` (inscriptions formation)
@@ -168,7 +200,9 @@ Les emails HubSpot suivent ce pattern :
 - `PRES - CD - RM7 - Chirurgie guidée (2eme envoi 032026)` → Présentiel, CD, RM7, thème: Chirurgie guidée
 - `CV - MK - Pathologies de l'épaule (3eme envoi 032026)` → Classe Virtuelle, MK, thème: Pathologies de l'épaule
 
-## Avancement MVP (avril 2026)
+**Champ `kind` retourné par `parseEmailName`** : `'dpc' | 'webinaire' | 'newsletter' | 'commercial' | 'unknown'`. Utilisé par `sync.ts` pour filtrer (`commercial` et `webinaire` exclus de la sync).
+
+## Avancement (mai 2026)
 
 ### Fait
 
@@ -181,19 +215,18 @@ Les emails HubSpot suivent ce pattern :
 | Listes préfixées `[Agent]` (jamais supprimées) | idem |
 | Résolution contact IDs via CRM v3 search (batches de 5 en parallèle) | idem |
 | Page gestion listes (vue + création) | `app/dashboard/listes/` |
-| Export CSV | `app/dashboard/export/` |
+| Export CSV centralisé (thématiques, inscrits, non inscrits) | `app/dashboard/export/`, `lib/csv.ts` |
 | Croisement HubSpot × Airtable (inscrits/non-inscrits) | `lib/sync.ts`, `lib/airtable.ts` |
 | Pipeline sync paginé (150 contacts/run → thèmes → Supabase upsert, cap 10 000) | `lib/sync.ts` |
 | Cron Vercel 1x/jour à 1h UTC (cycle complet ~67j, limite Hobby Vercel) | `app/api/cron/sync-contacts/`, `vercel.json` |
 | Sidebar navigation | `components/sidebar.tsx` |
-
-### En cours / Bloquant
-
-**Problème Supabase PGRST205** : la table `contact_click_themes` n'est pas visible par PostgREST après sa création.
-
-- Cause : PostgREST cache le schéma au démarrage. Une table créée sans `NOTIFY pgrst, 'reload schema'` reste invisible.
-- Solution : exécuter `NOTIFY pgrst, 'reload schema';` dans l'éditeur SQL Supabase après création de la table.
-- Test de validation : `npx tsx --env-file=.env.local --tsconfig tsconfig.json scripts/test-supabase.ts`
+| Normalisation thèmes (strip + alias + GARBAGE_PATTERNS) | `lib/hubspot.ts` |
+| Exclusion campagnes commerciales/webinaires de la sync (`kind`) | `lib/hubspot.ts`, `lib/sync.ts` |
+| DELETE ligne au sync quand 0 thème (nettoyage fossiles) | `lib/sync.ts` |
+| Fiche détail contact (Supabase + enrichment HubSpot) | `app/api/contacts/[email]/`, `app/dashboard/contacts/[email]/` |
+| Gestion utilisateurs (table user_profiles + CRUD admin) | `app/api/admin/users/*`, `app/dashboard/admin/users/` |
+| Changement mot de passe self-service | `app/api/profile/password/`, `app/dashboard/profile/` |
+| Augmentation types NextAuth (role + name) | `types/next-auth.d.ts` |
 
 ### Post-MVP (ne pas implémenter maintenant)
 
@@ -201,9 +234,43 @@ Les emails HubSpot suivent ce pattern :
 - Notifications automatiques
 - Intégration d'autres outils
 
+## Architecture des thèmes
+
+**Source unique de parsing** : `parseEmailName` dans `src/lib/hubspot.ts`. Utilisée par les deux pipelines (live `getMarketingEmails` + sync `getContactClickThemes`). Tout changement de format se fait à un seul endroit.
+
+### `normalizeTheme` — pipeline de nettoyage
+
+Appelé en sortie de chaque branche de `parseEmailName`. Ordre des opérations :
+
+1. **Strip préfixes** : dates `\d{4,8}[\s_]+`, `Suivi`, DPC `(EL|CV|PRES)[/\s-]+(MG|CD|MK|SF|PSY|PED|GYN|PLURIPRO)?[\s-]*`, RM RAPPEL (→ early return `''`), RM SYNTHESE, `RM\d+\s*-`, `RM\d+\s*$` (orphelin), `Primo inscrits`, `Version \w+\s*[-:]`.
+2. **Strip suffixes** : `(Nème envoi)`, `(Cloner)`, `(Copy)`, `(Variation)`, `Relance` final, parenthèses orphelines, tirets orphelins.
+3. **Normalisation finale** : collapse whitespace, trim, capitalize première lettre.
+4. **`GARBAGE_PATTERNS` (pre-alias)** : filet de sûreté si le strip a raté. Matche `^Rappel J\d+`, `^\d+ formations?`, `^\(\d+ formations?\)`, `^CV\s*-`, `^PRES\s*-`, `^EL\s*-`, `^Version\s`, `^Quizz?\s`, `^Dangers$`. Si match → `return ''`.
+5. **`THEME_ALIASES` lookup** (54 entrées) : dédoublonne les variantes connues (`HTA` → `Hypertension artérielle`, `Sommeil` → `Troubles du sommeil`, `Perturbateur endo` → `Perturbateurs endocriniens`, etc.).
+
+### `isCommercial` — exclusion au niveau campagne
+
+Matche le **rawName** complet (ancré `^` ou pas selon le pattern). Si une de ces regex match, `parseEmailName` retourne `kind: 'commercial'` :
+- `black friday`, `flash sales?`, `saint.?valentin`, `\boffre\b`, `fin d'année`, `budget`, `confirmation`, `ouverture budget`
+- `livre blanc`, `^quizz?\s`, `^\d+\s+formations?`, `^\(\d+\s+formations?\)`, `^dangers$`
+- `^Rappel\s+J[+-]?\d+` (J-2, J-8, J-23)
+
+### `kind` retourné par `parseEmailName`
+
+`'dpc' | 'webinaire' | 'newsletter' | 'commercial' | 'unknown'`. Pipeline DPC reconnu uniquement pour `kind === 'dpc'`.
+
+### Filtres `sync.ts`
+
+Pour chaque campagne d'un contact :
+- skip si `kind === 'commercial'` ou `kind === 'webinaire'`
+- skip si `theme === ''` ou `theme === 'Sans thème'` ou `theme === 'Newsletter'`
+- agrège par thème, **skip thème final si `clicks < 3`**
+
+**Si un contact n'a aucun thème valide après filtrage** → `DELETE FROM contact_click_themes WHERE email = ...`. C'est volontaire : empêche les fossiles d'anciennes versions du code de persister en base. Décision documentée dans `sync.ts:305`.
+
 ## Architecture des filtres de la page Listes
 
-La page `/dashboard/listes` propose **3 modes** pour la création de listes HubSpot — tous lisent `contact_click_themes` Supabase comme source unique. Le filtre `clicks >= 3` est garanti par `sync.ts:144` au moment du sync, donc tout thème stocké est par définition "qualifié".
+La page `/dashboard/listes` propose **3 modes** pour la création de listes HubSpot — tous lisent `contact_click_themes` Supabase comme source unique. Le filtre `clicks >= 3` est garanti par `sync.ts` au moment du sync, donc tout thème stocké est par définition "qualifié".
 
 | Mode | Route API | Filtre Supabase | Filtre thématique |
 |---|---|---|---|
@@ -213,7 +280,75 @@ La page `/dashboard/listes` propose **3 modes** pour la création de listes HubS
 
 **Mode `thematique` retiré** (avril 2026). Il filtrait `topData.segments.inscrits` par substring sur `nomFormation` Airtable — sémantiquement faux (le nom de formation Airtable n'est pas le thème HubSpot). Remplacé par `inscrits + dropdown thème Supabase`, qui fait un match exact.
 
-**Aucune route ne dépend plus de `getTopClickersEnriched` pour les modes de listes** — `topData` n'est plus fetché au mount. Conséquence : la page Listes ne consomme plus que Supabase, et hérite donc de la fraîcheur du cron (1×/jour).
+**Aucune route ne dépend plus de `getTopClickersEnriched` pour les modes de listes** — `topData` n'est plus fetché au mount. La page Listes ne consomme que Supabase, et hérite donc de la fraîcheur du cron (1×/jour).
+
+**Composants factorisés** : `PreviewTable` + `ThemeFilterDropdown` partagés entre les 3 modes.
+
+## Gestion des utilisateurs
+
+### Modèle de données
+
+Table `public.user_profiles` (cf. section Schéma Supabase) — étend `auth.users` avec rôle et statut applicatif. **Pas de table custom pour les credentials** : le bcrypt reste géré par Supabase Auth (GoTrue) via `auth.users.encrypted_password`.
+
+### Flow d'authentification — IMPORTANT
+
+`authorize()` dans `lib/auth.ts` enchaîne :
+1. `supabase.auth.signInWithPassword({ email, password })` → vérif bcrypt côté Supabase
+2. SELECT sur `user_profiles` pour récupérer `role` + `is_active` + `full_name`
+3. Si profil absent ou `is_active = false` → return null (login refusé)
+4. UPDATE `last_login_at` fire-and-forget
+5. Return `{ id, email, name, role }` → propagé via callbacks `jwt()` et `session()`
+
+**⚠️ Piège à éviter — client Supabase séparé pour le SELECT profil.** Après `signInWithPassword`, l'instance Supabase est "tainté" : le contexte auth bascule vers le JWT utilisateur, et les requêtes PostgREST qui suivent l'utilisent au lieu du `service_role`. Avec RLS activée et 0 policy, ça retourne 0 lignes → login systématiquement refusé. **Fix** : appeler `createSupabaseAdmin()` une seconde fois pour avoir un client neuf avec service_role pure. Documenté dans `lib/auth.ts:23`.
+
+### Routes
+
+| Méthode + route | Guard | Action |
+|---|---|---|
+| `GET /api/admin/users` | admin | Liste tous les profils |
+| `POST /api/admin/users` | admin | Crée auth.users + user_profiles (validation `@medere.fr`) |
+| `PATCH /api/admin/users/[id]` | admin | Update role/is_active/email/full_name. Garde-fou : ≥1 admin actif |
+| `POST /api/admin/users/[id]/reset-password` | admin | Reset MDP par un admin |
+| `POST /api/profile/password` | user | Changement de son propre MDP (re-auth avec ancien MDP) |
+
+### Middleware
+
+Guard admin sur `/dashboard/admin/*` (→ redirect `/dashboard`) et `/api/admin/*` (→ 403). Lit `session.user.role` depuis le JWT — pas de round-trip DB.
+
+### Pages
+
+- `/dashboard/admin/users` (admin only) : tableau + modale création + modale édition (email, nom, rôle, statut, reset password)
+- `/dashboard/profile` (tous) : infos read-only + form changement mot de passe
+
+### Sidebar
+
+- Section « Administration » conditionnelle (`role === 'admin'`)
+- User pill cliquable → `/dashboard/profile`
+
+### Types augmentés
+
+`src/types/next-auth.d.ts` étend `User`, `Session.user` et `JWT` avec `id: string` + `role: 'admin' | 'user'`. Note : casts `as string`/`as 'admin' | 'user'` requis dans `session()` callback car NextAuth v5 type le JWT avec `Record<string, unknown>` qui dégrade les types augmentés.
+
+### Bootstrap
+
+Admins initiaux : `arnaud@medere.fr` + `dethie@medere.fr` (mêmes droits). Création des comptes auth via Supabase Studio puis script SQL pour insérer le profil avec `role = 'admin'`.
+
+### Limites assumées
+
+- JWT signé en cookie (pas DB-backed) → désactivation/rétrogradation prend effet à la prochaine connexion (max 8h)
+- Audit log absent (création/modification d'utilisateur non tracée) — hors scope MVP
+
+## Fiche détail contact
+
+- **Route** `/api/contacts/[email]` : lit `contact_click_themes` Supabase (source authoritative) puis enrichit best-effort avec HubSpot (firstname, lastname, hs_email_open, hs_email_delivered) — si HubSpot down, on retourne quand même les données Supabase
+- **Page** `/dashboard/contacts/[email]` : metric cards (clics totaux, ouvertures, taux ouverture) + tableau des thèmes cliqués (cliquables) + tableau inscriptions Airtable
+- **Liens entrants** : emails cliquables dans `/dashboard/top-cliqueurs` et `/dashboard/listes` (preview) → `Link` vers la fiche
+
+## Export CSV
+
+- **Page** `/dashboard/export` : 3 sections — Thématiques (tableau agrégé), Non inscrits, Inscrits
+- **Utilitaire** `src/lib/csv.ts` : centralise le format (BOM UTF-8 pour Excel FR, séparateur `;`, fin de ligne CRLF)
+- Top cliqueurs refactoré pour utiliser le même utilitaire — un seul endroit où le format peut diverger
 
 ## Décisions techniques
 
@@ -230,6 +365,26 @@ La page `/dashboard/listes` propose **3 modes** pour la création de listes HubS
 | `parseEmailName` (lib/hubspot.ts) source unique de vérité pour le parsing du thème | Utilisée par les deux pipelines (live `getMarketingEmails` + sync `getContactClickThemes`). Tout changement de format se fait à un seul endroit |
 | Routes `tags: ['hubspot']` + cron `revalidateTag('hubspot', { expire: 0 })` | Invalide tous les caches après chaque sync — évite les listes périmées |
 | URL HubSpot EU : `app-eu1.hubspot.com/.../objectLists/{id}` | Portail Médéré hébergé en EU. Les URLs `/lists/` redirigent mais perdent les paramètres |
+| Second client `createSupabaseAdmin()` après `signInWithPassword` dans `auth.ts` | Le premier client devient tainté (contexte auth bascule sur le JWT user) → SELECT user_profiles bloqué par RLS |
+| GARBAGE_PATTERNS placés **pre-alias** dans `normalizeTheme` | Si le strip de préfixes a fait son job, la chaîne est déjà clean — GARBAGE ne fire pas inutilement. Sinon il rattrape les résidus (`CV - `, `Version `, etc.) |
+
+## Bugs résolus
+
+| Symptôme | Cause | Fix |
+|---|---|---|
+| Login refusé malgré profil correct | Client Supabase tainté par `signInWithPassword` utilise le JWT user → RLS bloque le SELECT `user_profiles` | Second `createSupabaseAdmin()` pour le SELECT/UPDATE profil |
+| Thèmes parasites persistants en base après un deploy qui change le parsing | Sync forward-only : ne retouche que la fenêtre du jour (~150 contacts), les ~9 850 autres gardent leurs vieux thèmes. Et quand le nouveau code épure tout → skip upsert → fossile reste | `sync.ts:305` fait maintenant un `DELETE` quand `themes.length === 0` au lieu de skip. Pour reset complet après un deploy invasif : truncate + reset curseur |
+| « Rappel J-23 », « 3 formations » et autres résidus dans les thèmes même avec `isCommercial` étendu | `isCommercial` est ancré `^` sur le rawName complet → si ces patterns sont en milieu de chaîne (`CV - MG - Rappel J-23 - Sommeil`), pas de match | `GARBAGE_PATTERNS` dans `normalizeTheme` agit sur la chaîne post-strip, attrape les patterns au milieu |
+| PGRST205 — Could not find the table in the schema cache | PostgREST cache le schéma au démarrage. Une table créée sans notification reste invisible | `NOTIFY pgrst, 'reload schema';` dans l'éditeur SQL après création de table |
+
+## TODO restants
+
+- **Phase C alias map** : affiner `THEME_ALIASES` avec Arnaud après un cycle complet de sync (identifier les variantes vues en prod qui ne sont pas encore mappées)
+- **Migrer `middleware.ts` → `proxy.ts`** : convention deprecated en Next.js 16 (warning au build)
+- **Corriger les erreurs ESLint** : refactor des `useEffect` problématiques
+- **Réparer WSL2** (env dev local)
+- **Migrer Top cliqueurs sur Supabase** : clarifier le besoin avec Arnaud (aujourd'hui live HubSpot, lifetime clicks)
+- **« Version New Gen… » dans `normalizeTheme`** : la regex `^(?:Primo\s+inscrits|Version\s+\w+)\s*[-:]\s*` exige `-` ou `:` après le préfixe Version + 1 mot. Trop strict pour « Version New Gen CV - CD - … ». **Partiellement résolu via GARBAGE_PATTERNS** (`/^Version\s/i` filtre maintenant), mais une amélioration du strip serait plus propre
 
 ## Workflow de développement
 
