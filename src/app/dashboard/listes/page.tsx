@@ -194,26 +194,42 @@ function ThemeFilterDropdown({
   )
 }
 
-function DpcToggle({
-  checked, onChange, disabled,
+function DpcFilter({
+  value, onChange, disabled,
 }: {
-  checked: boolean
-  onChange: (v: boolean) => void
+  value: string
+  onChange: (v: string) => void
   disabled?: boolean
 }) {
   return (
-    <label className="inline-flex items-center gap-2 cursor-pointer select-none mb-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disabled={disabled}
-        className="w-3.5 h-3.5 rounded-[3px] border-[#d4d4d4] text-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] disabled:opacity-50 disabled:cursor-not-allowed"
-      />
-      <span className={`text-xs ${disabled ? 'text-[#a3a3a3]' : 'text-[#0a0a0a]'}`}>
-        Éligibles DPC uniquement
-      </span>
-    </label>
+    <div className="flex items-center gap-2 mb-3">
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className="pl-3 pr-8 py-2.5 text-sm text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">Tous (DPC indifférent)</option>
+          <option value="true">Éligibles DPC</option>
+          <option value="false">Non éligibles DPC</option>
+        </select>
+        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M2 3.5l3 3 3-3" stroke="#a3a3a3" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </div>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
+        >
+          Effacer
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -236,7 +252,7 @@ export default function ListesPage() {
   const [inscritsData, setInscritsData] = useState<ContactItem[] | null>(null)
   const [inscritsThemes, setInscritsThemes] = useState<string[]>([])
   const [inscritsSelectedTheme, setInscritsSelectedTheme] = useState('')
-  const [inscritsEligibleDpc, setInscritsEligibleDpc] = useState(false)
+  const [inscritsEligibleDpc, setInscritsEligibleDpc] = useState('')
   const [inscritsLoading, setInscritsLoading] = useState(false)
   const [inscritsError, setInscritsError] = useState('')
 
@@ -244,7 +260,7 @@ export default function ListesPage() {
   const [nonInscritsData, setNonInscritsData] = useState<ContactItem[] | null>(null)
   const [nonInscritsThemes, setNonInscritsThemes] = useState<string[]>([])
   const [nonInscritsSelectedTheme, setNonInscritsSelectedTheme] = useState('')
-  const [nonInscritsEligibleDpc, setNonInscritsEligibleDpc] = useState(false)
+  const [nonInscritsEligibleDpc, setNonInscritsEligibleDpc] = useState('')
   const [nonInscritsLoading, setNonInscritsLoading] = useState(false)
   const [nonInscritsError, setNonInscritsError] = useState('')
 
@@ -316,7 +332,7 @@ export default function ListesPage() {
       try {
         const params = new URLSearchParams()
         if (inscritsSelectedTheme) params.set('theme', inscritsSelectedTheme)
-        if (inscritsEligibleDpc) params.set('eligible_dpc', 'true')
+        if (inscritsEligibleDpc) params.set('eligible_dpc', inscritsEligibleDpc)
         const qs = params.toString()
         const url = qs ? `/api/contacts/inscrits?${qs}` : '/api/contacts/inscrits'
         const res = await fetch(url)
@@ -348,7 +364,7 @@ export default function ListesPage() {
       try {
         const params = new URLSearchParams()
         if (nonInscritsSelectedTheme) params.set('theme', nonInscritsSelectedTheme)
-        if (nonInscritsEligibleDpc) params.set('eligible_dpc', 'true')
+        if (nonInscritsEligibleDpc) params.set('eligible_dpc', nonInscritsEligibleDpc)
         const qs = params.toString()
         const url = qs ? `/api/contacts/by-theme?${qs}` : '/api/contacts/by-theme'
         const res = await fetch(url)
@@ -576,8 +592,8 @@ export default function ListesPage() {
                 options={inscritsThemes}
                 loading={inscritsLoading}
               />
-              <DpcToggle
-                checked={inscritsEligibleDpc}
+              <DpcFilter
+                value={inscritsEligibleDpc}
                 onChange={setInscritsEligibleDpc}
                 disabled={inscritsLoading}
               />
@@ -605,8 +621,8 @@ export default function ListesPage() {
                 options={nonInscritsThemes}
                 loading={nonInscritsLoading}
               />
-              <DpcToggle
-                checked={nonInscritsEligibleDpc}
+              <DpcFilter
+                value={nonInscritsEligibleDpc}
                 onChange={setNonInscritsEligibleDpc}
                 disabled={nonInscritsLoading}
               />
