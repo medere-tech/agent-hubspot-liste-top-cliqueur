@@ -5,7 +5,9 @@
       "Bash(npm run *)",
       "Bash(npx tsc *)",
       "mcp__claude_ai_Supabase__list_projects",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_HubSpot__search_properties",
+      "mcp__claude_ai_HubSpot__get_properties"
     ]
   }
 }

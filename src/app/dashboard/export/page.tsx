@@ -36,6 +36,7 @@ interface ContactItem {
   lastClickOnTheme: string
   themes?: ThemeDetail[]
   inscriptions?: InscriptionDetail[]
+  eligibleDpc?: string | null
 }
 
 interface ContactsApiResponse {
@@ -79,6 +80,10 @@ function slugify(s: string): string {
 
 function pluralRows(n: number, singular: string, plural: string): string {
   return `${n} ${n !== 1 ? plural : singular}`
+}
+
+function formatDpc(value: string | null | undefined): string {
+  return value === 'true' ? 'Oui' : value === 'false' ? 'Non' : ''
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -302,7 +307,7 @@ export default function ExportPage() {
       const apiData = json as ContactsApiResponse
 
       const headers = [
-        'Email', 'Contact ID', 'Clics sur le thème', 'Clics totaux', 'Dernier clic', 'Thèmes',
+        'Email', 'Contact ID', 'Clics sur le thème', 'Clics totaux', 'Dernier clic', 'Eligible DPC', 'Thèmes',
       ]
       const rows = apiData.prospects.map((p) => [
         p.email,
@@ -310,6 +315,7 @@ export default function ExportPage() {
         String(p.clicksOnTheme),
         String(p.totalClicks),
         fmtDateFr(p.lastClickOnTheme),
+        formatDpc(p.eligibleDpc),
         (p.themes ?? []).map((t) => t.theme).join(', '),
       ])
 
@@ -344,7 +350,7 @@ export default function ExportPage() {
       const apiData = json as ContactsApiResponse
 
       const headers = [
-        'Email', 'Contact ID', 'Clics sur le thème', 'Clics totaux', 'Dernier clic', 'Formations',
+        'Email', 'Contact ID', 'Clics sur le thème', 'Clics totaux', 'Dernier clic', 'Eligible DPC', 'Formations',
       ]
       const rows = apiData.prospects.map((p) => [
         p.email,
@@ -352,6 +358,7 @@ export default function ExportPage() {
         String(p.clicksOnTheme),
         String(p.totalClicks),
         fmtDateFr(p.lastClickOnTheme),
+        formatDpc(p.eligibleDpc),
         (p.inscriptions ?? []).map((i) => i.nomFormation).join(', '),
       ])
 

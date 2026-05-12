@@ -15,6 +15,7 @@ interface ContactRow {
   total_clicks: number
   is_inscrit: boolean
   themes: ThemeEntry[] | null
+  eligible_dpc: string | null
 }
 
 export interface HotProspect {
@@ -26,6 +27,8 @@ export interface HotProspect {
   /** Si filtre theme : lastClick de ce thème. Sinon : lastClick le plus récent du contact. */
   lastClickOnTheme: string
   themes: ThemeEntry[]
+  /** "true" | "false" | null — propriété custom HubSpot */
+  eligibleDpc: string | null
 }
 
 interface CachedResult {
@@ -34,7 +37,11 @@ interface CachedResult {
 }
 
 const getCachedHotProspects = unstable_cache(
-  async (theme: string, minClicks: number): Promise<CachedResult> => {
+  async (
+    theme: string,
+    minClicks: number,
+    eligibleDpc: 'true' | 'false' | undefined
+  ): Promise<CachedResult> => {
     const supabase = createSupabaseAdmin()
 
     // Pagination Supabase — table cap à 10 000 contacts
@@ -43,11 +50,15 @@ const getCachedHotProspects = unstable_cache(
     let from = 0
 
     while (true) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('contact_click_themes')
-        .select('email, contact_id, total_clicks, is_inscrit, themes')
+        .select('email, contact_id, total_clicks, is_inscrit, themes, eligible_dpc')
         .eq('is_inscrit', false)
         .range(from, from + PAGE - 1)
+
+      if (eligibleDpc) query = query.eq('eligible_dpc', eligibleDpc)
+
+      const { data, error } = await query
 
       if (error) throw new Error(error.message)
       if (!data || data.length === 0) break
@@ -88,6 +99,7 @@ const getCachedHotProspects = unstable_cache(
           clicksOnTheme:    matching.clicks,
           lastClickOnTheme: matching.lastClick,
           themes,
+          eligibleDpc:      row.eligible_dpc,
         })
       } else {
         // Sans filtre : tous les non-inscrits avec au moins un thème en base.
@@ -106,6 +118,7 @@ const getCachedHotProspects = unstable_cache(
           clicksOnTheme:    row.total_clicks,
           lastClickOnTheme: lastClick,
           themes,
+          eligibleDpc:      row.eligible_dpc,
         })
       }
     }
@@ -144,11 +157,18 @@ export async function GET(req: NextRequest) {
   const minClicks =
     Number.isFinite(minClicksParsed) && minClicksParsed > 0 ? minClicksParsed : 3
 
+  // eligible_dpc — toggle binaire côté UI. Seules les valeurs "true" et "false"
+  // sont acceptées (cohérent avec ce que stocke HubSpot). Tout autre valeur ignorée.
+  const dpcRaw = req.nextUrl.searchParams.get('eligible_dpc')
+  const eligibleDpc: 'true' | 'false' | undefined =
+    dpcRaw === 'true' || dpcRaw === 'false' ? dpcRaw : undefined
+
   try {
-    const { prospects, uniqueThemes } = await getCachedHotProspects(theme, minClicks)
+    const { prospects, uniqueThemes } = await getCachedHotProspects(theme, minClicks, eligibleDpc)
     return NextResponse.json({
       theme: theme || null,
       minClicks,
+      eligibleDpc: eligibleDpc ?? null,
       count: prospects.length,
       prospects,
       uniqueThemes,

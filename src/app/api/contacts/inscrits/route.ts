@@ -22,6 +22,7 @@ interface ContactRow {
   is_inscrit: boolean
   themes: ThemeEntry[] | null
   inscriptions: Inscription[] | null
+  eligible_dpc: string | null
 }
 
 export interface InscritProspect {
@@ -34,6 +35,8 @@ export interface InscritProspect {
   lastClickOnTheme: string
   themes: ThemeEntry[]
   inscriptions: Inscription[]
+  /** "true" | "false" | null — propriété custom HubSpot */
+  eligibleDpc: string | null
 }
 
 interface CachedResult {
@@ -42,7 +45,11 @@ interface CachedResult {
 }
 
 const getCachedInscrits = unstable_cache(
-  async (theme: string, minClicks: number): Promise<CachedResult> => {
+  async (
+    theme: string,
+    minClicks: number,
+    eligibleDpc: 'true' | 'false' | undefined
+  ): Promise<CachedResult> => {
     const supabase = createSupabaseAdmin()
 
     // Pagination Supabase — table cap à 10 000 contacts
@@ -51,11 +58,15 @@ const getCachedInscrits = unstable_cache(
     let from = 0
 
     while (true) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('contact_click_themes')
-        .select('email, contact_id, total_clicks, is_inscrit, themes, inscriptions')
+        .select('email, contact_id, total_clicks, is_inscrit, themes, inscriptions, eligible_dpc')
         .eq('is_inscrit', true)
         .range(from, from + PAGE - 1)
+
+      if (eligibleDpc) query = query.eq('eligible_dpc', eligibleDpc)
+
+      const { data, error } = await query
 
       if (error) throw new Error(error.message)
       if (!data || data.length === 0) break
@@ -100,6 +111,7 @@ const getCachedInscrits = unstable_cache(
           lastClickOnTheme: matching.lastClick,
           themes,
           inscriptions,
+          eligibleDpc:      row.eligible_dpc,
         })
       } else {
         // Sans filtre : tous les inscrits avec au moins un thème.
@@ -118,6 +130,7 @@ const getCachedInscrits = unstable_cache(
           lastClickOnTheme: lastClick,
           themes,
           inscriptions,
+          eligibleDpc:      row.eligible_dpc,
         })
       }
     }
@@ -155,11 +168,16 @@ export async function GET(req: NextRequest) {
   const minClicks =
     Number.isFinite(minClicksParsed) && minClicksParsed > 0 ? minClicksParsed : 3
 
+  const dpcRaw = req.nextUrl.searchParams.get('eligible_dpc')
+  const eligibleDpc: 'true' | 'false' | undefined =
+    dpcRaw === 'true' || dpcRaw === 'false' ? dpcRaw : undefined
+
   try {
-    const { prospects, uniqueThemes } = await getCachedInscrits(theme, minClicks)
+    const { prospects, uniqueThemes } = await getCachedInscrits(theme, minClicks, eligibleDpc)
     return NextResponse.json({
       theme: theme || null,
       minClicks,
+      eligibleDpc: eligibleDpc ?? null,
       count: prospects.length,
       prospects,
       uniqueThemes,

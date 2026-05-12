@@ -37,6 +37,7 @@ interface ContactItem {
   totalClicks: number
   clicksOnTheme: number
   lastClickOnTheme: string
+  eligibleDpc: string | null
 }
 
 interface ContactsApiResponse {
@@ -104,6 +105,9 @@ function PreviewTable({
               <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
                 Dernier clic
               </th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-[#a3a3a3] tracking-wide uppercase">
+                DPC
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -113,11 +117,12 @@ function PreviewTable({
                   <td className="px-4 py-2.5"><div className="h-4 w-48 bg-[#f5f5f5] rounded animate-pulse" /></td>
                   <td className="px-4 py-2.5"><div className="h-4 w-8 bg-[#f5f5f5] rounded animate-pulse ml-auto" /></td>
                   <td className="px-4 py-2.5"><div className="h-4 w-20 bg-[#f5f5f5] rounded animate-pulse" /></td>
+                  <td className="px-4 py-2.5"><div className="h-4 w-8 bg-[#f5f5f5] rounded animate-pulse" /></td>
                 </tr>
               ))
             ) : (data?.length ?? 0) === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
                   {selectedTheme ? emptyFilteredMessage : emptyAllMessage}
                 </td>
               </tr>
@@ -134,6 +139,9 @@ function PreviewTable({
                   </td>
                   <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
                   <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
+                  <td className="px-4 py-2.5 text-[#737373]">
+                    {p.eligibleDpc === 'true' ? 'Oui' : p.eligibleDpc === 'false' ? 'Non' : '—'}
+                  </td>
                 </tr>
               ))
             )}
@@ -186,6 +194,29 @@ function ThemeFilterDropdown({
   )
 }
 
+function DpcToggle({
+  checked, onChange, disabled,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <label className="inline-flex items-center gap-2 cursor-pointer select-none mb-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="w-3.5 h-3.5 rounded-[3px] border-[#d4d4d4] text-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] disabled:opacity-50 disabled:cursor-not-allowed"
+      />
+      <span className={`text-xs ${disabled ? 'text-[#a3a3a3]' : 'text-[#0a0a0a]'}`}>
+        Éligibles DPC uniquement
+      </span>
+    </label>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ListesPage() {
@@ -205,6 +236,7 @@ export default function ListesPage() {
   const [inscritsData, setInscritsData] = useState<ContactItem[] | null>(null)
   const [inscritsThemes, setInscritsThemes] = useState<string[]>([])
   const [inscritsSelectedTheme, setInscritsSelectedTheme] = useState('')
+  const [inscritsEligibleDpc, setInscritsEligibleDpc] = useState(false)
   const [inscritsLoading, setInscritsLoading] = useState(false)
   const [inscritsError, setInscritsError] = useState('')
 
@@ -212,6 +244,7 @@ export default function ListesPage() {
   const [nonInscritsData, setNonInscritsData] = useState<ContactItem[] | null>(null)
   const [nonInscritsThemes, setNonInscritsThemes] = useState<string[]>([])
   const [nonInscritsSelectedTheme, setNonInscritsSelectedTheme] = useState('')
+  const [nonInscritsEligibleDpc, setNonInscritsEligibleDpc] = useState(false)
   const [nonInscritsLoading, setNonInscritsLoading] = useState(false)
   const [nonInscritsError, setNonInscritsError] = useState('')
 
@@ -281,9 +314,11 @@ export default function ListesPage() {
       setInscritsLoading(true)
       setInscritsError('')
       try {
-        const url = inscritsSelectedTheme
-          ? `/api/contacts/inscrits?theme=${encodeURIComponent(inscritsSelectedTheme)}`
-          : '/api/contacts/inscrits'
+        const params = new URLSearchParams()
+        if (inscritsSelectedTheme) params.set('theme', inscritsSelectedTheme)
+        if (inscritsEligibleDpc) params.set('eligible_dpc', 'true')
+        const qs = params.toString()
+        const url = qs ? `/api/contacts/inscrits?${qs}` : '/api/contacts/inscrits'
         const res = await fetch(url)
         const json = await res.json()
         if (!res.ok) {
@@ -301,7 +336,7 @@ export default function ListesPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [source, inscritsSelectedTheme])
+  }, [source, inscritsSelectedTheme, inscritsEligibleDpc])
 
   // ── Fetch non-inscrits ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -311,9 +346,11 @@ export default function ListesPage() {
       setNonInscritsLoading(true)
       setNonInscritsError('')
       try {
-        const url = nonInscritsSelectedTheme
-          ? `/api/contacts/by-theme?theme=${encodeURIComponent(nonInscritsSelectedTheme)}`
-          : '/api/contacts/by-theme'
+        const params = new URLSearchParams()
+        if (nonInscritsSelectedTheme) params.set('theme', nonInscritsSelectedTheme)
+        if (nonInscritsEligibleDpc) params.set('eligible_dpc', 'true')
+        const qs = params.toString()
+        const url = qs ? `/api/contacts/by-theme?${qs}` : '/api/contacts/by-theme'
         const res = await fetch(url)
         const json = await res.json()
         if (!res.ok) {
@@ -331,7 +368,7 @@ export default function ListesPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [source, nonInscritsSelectedTheme])
+  }, [source, nonInscritsSelectedTheme, nonInscritsEligibleDpc])
 
   // ── Fetch prospects chauds ─────────────────────────────────────────────────
   useEffect(() => {
@@ -539,6 +576,11 @@ export default function ListesPage() {
                 options={inscritsThemes}
                 loading={inscritsLoading}
               />
+              <DpcToggle
+                checked={inscritsEligibleDpc}
+                onChange={setInscritsEligibleDpc}
+                disabled={inscritsLoading}
+              />
               <PreviewTable
                 data={inscritsData}
                 loading={inscritsLoading}
@@ -562,6 +604,11 @@ export default function ListesPage() {
                 onChange={setNonInscritsSelectedTheme}
                 options={nonInscritsThemes}
                 loading={nonInscritsLoading}
+              />
+              <DpcToggle
+                checked={nonInscritsEligibleDpc}
+                onChange={setNonInscritsEligibleDpc}
+                disabled={nonInscritsLoading}
               />
               <PreviewTable
                 data={nonInscritsData}

@@ -766,6 +766,8 @@ export interface TopClicker {
   totalOpens: number
   totalDelivered: number
   openRate: number | null
+  /** "true" | "false" | null — propriété custom HubSpot, renseignée manuellement par les commerciaux */
+  eligibleDpc: string | null
 }
 
 interface CrmContactSearchResult {
@@ -775,6 +777,7 @@ interface CrmContactSearchResult {
     hs_email_click: string | null
     hs_email_open: string | null
     hs_email_delivered: string | null
+    eligible_dpc: string | null
   }
 }
 
@@ -819,7 +822,7 @@ export async function getTopClickers(
         { filters: [{ propertyName: 'hs_email_click', operator: 'GT', value: '0' }] },
       ],
       sorts: [{ propertyName: 'hs_email_click', direction: 'DESCENDING' }],
-      properties: ['email', 'hs_email_click', 'hs_email_open', 'hs_email_delivered'],
+      properties: ['email', 'hs_email_click', 'hs_email_open', 'hs_email_delivered', 'eligible_dpc'],
       limit: pageLimit,
       ...(after ? { after } : {}),
     }
@@ -847,6 +850,12 @@ export async function getTopClickers(
       const clicks    = parseInt(c.properties.hs_email_click    ?? '0', 10)
       const opens     = parseInt(c.properties.hs_email_open     ?? '0', 10)
       const delivered = parseInt(c.properties.hs_email_delivered ?? '0', 10)
+
+      // HubSpot renvoie "true" | "false" | null | "" — normalise à null si vide/absent.
+      // La colonne SQL est nullable, on ne stocke jamais de string vide.
+      const rawDpc = c.properties.eligible_dpc
+      const eligibleDpc = rawDpc && rawDpc.trim() ? rawDpc : null
+
       results.push({
         contactId:      parseInt(c.id, 10),
         emailAddress:   email,
@@ -854,6 +863,7 @@ export async function getTopClickers(
         totalOpens:     opens,
         totalDelivered: delivered,
         openRate: delivered > 0 ? (opens / delivered) * 100 : null,
+        eligibleDpc,
       })
     }
 

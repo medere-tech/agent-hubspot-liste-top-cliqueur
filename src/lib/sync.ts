@@ -329,6 +329,7 @@ export async function syncAllTopClickers(
               specialite:   ins.specialite,
               dateCreation: ins.dateCreation,
             })),
+            eligible_dpc:   contact.eligibleDpc,
             last_synced_at: new Date().toISOString(),
           }
 
