@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 interface ThemeEntry {
   theme: string
@@ -112,7 +112,7 @@ const getCachedThemes = unstable_cache(
   { revalidate: 60, tags: ['hubspot'] }
 )
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await auth()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

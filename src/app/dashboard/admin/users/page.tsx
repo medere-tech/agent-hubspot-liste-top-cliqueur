@@ -259,31 +259,16 @@ function EditUserModal({
   onUpdated: () => void
 }) {
   const [form, setForm] = useState<EditForm>({
-    email: '',
-    full_name: '',
-    role: 'user',
-    is_active: true,
+    email: user?.email ?? '',
+    full_name: user?.full_name ?? '',
+    role: user?.role ?? 'user',
+    is_active: user?.is_active ?? true,
   })
   const [newPassword, setNewPassword] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
-
-  // Sync local form state when modal opens with a new user
-  useEffect(() => {
-    if (user) {
-      setForm({
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role,
-        is_active: user.is_active,
-      })
-      setNewPassword('')
-      setError('')
-      setInfo('')
-    }
-  }, [user])
 
   if (!user) return null
 
@@ -511,6 +496,8 @@ export default function AdminUsersPage() {
   }, [])
 
   useEffect(() => {
+    // Fetch initial au mount — setState après await, pattern standard React.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh().finally(() => setLoading(false))
   }, [refresh])
 
@@ -613,6 +600,7 @@ export default function AdminUsersPage() {
         onCreated={refresh}
       />
       <EditUserModal
+        key={editingUser?.id ?? 'none'}
         user={editingUser}
         onClose={() => setEditingUser(null)}
         onUpdated={refresh}

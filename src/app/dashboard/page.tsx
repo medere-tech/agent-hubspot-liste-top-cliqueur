@@ -137,10 +137,11 @@ export default function DashboardPage() {
     }
   }, [])
 
-  useEffect(() => { fetchData(period) }, [period, fetchData])
-
-  // Reset page when any filter, period or page size changes
-  useEffect(() => { setPage(0) }, [search, typeFilter, audienceFilter, period, pageSize])
+  useEffect(() => {
+    // Fetch initial + à chaque changement de période — setState après await, pattern standard React.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData(period)
+  }, [period, fetchData])
 
   // ── Data derivation ────────────────────────────────────────────────────────
   const campaigns = data?.campaigns
@@ -213,7 +214,7 @@ export default function DashboardPage() {
           {PERIODS.map(({ label, value }) => (
             <button
               key={value}
-              onClick={() => setPeriod(value)}
+              onClick={() => { setPeriod(value); setPage(0) }}
               className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
                 period === value
                   ? 'bg-[#0a0a0a] text-white'
@@ -256,7 +257,7 @@ export default function DashboardPage() {
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(0) }}
           placeholder="Rechercher une thématique, une audience…"
           className="w-full pl-9 pr-4 py-2.5 text-sm text-[#0a0a0a] placeholder-[#a3a3a3] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all duration-150"
         />
@@ -269,7 +270,7 @@ export default function DashboardPage() {
           {TYPE_FILTER_OPTIONS.map(({ value, label }) => (
             <button
               key={value}
-              onClick={() => setTypeFilter(value)}
+              onClick={() => { setTypeFilter(value); setPage(0) }}
               className={`px-3 py-1.5 text-xs font-medium rounded-[4px] border transition-colors cursor-pointer ${
                 typeFilter === value
                   ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
@@ -288,7 +289,7 @@ export default function DashboardPage() {
         <div className="relative">
           <select
             value={audienceFilter}
-            onChange={(e) => setAudienceFilter(e.target.value)}
+            onChange={(e) => { setAudienceFilter(e.target.value); setPage(0) }}
             className="appearance-none pl-3 pr-7 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-colors cursor-pointer hover:border-[#0a0a0a] hover:text-[#0a0a0a]"
           >
             <option value="ALL">Toutes les audiences</option>
@@ -438,7 +439,7 @@ export default function DashboardPage() {
                 {PAGE_SIZE_OPTIONS.map((size) => (
                   <button
                     key={size}
-                    onClick={() => setPageSize(size)}
+                    onClick={() => { setPageSize(size); setPage(0) }}
                     className={`px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
                       pageSize === size
                         ? 'bg-[#0a0a0a] text-white'

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const MIN_PASSWORD_LEN = 8
 
-// ─── POST /api/admin/users/[id]/reset-password — reset par un admin ───────────
+// ─── POST /api/admin/users/[id]/reset-password - reset par un admin ───────────
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

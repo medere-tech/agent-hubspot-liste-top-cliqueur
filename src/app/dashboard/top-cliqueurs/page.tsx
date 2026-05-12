@@ -149,8 +149,11 @@ export default function TopCliqueurs() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
-  useEffect(() => { setPage(0) }, [search, segment, pageSize, themeFilter])
+  useEffect(() => {
+    // Fetch initial au mount — setState après await, pattern standard React.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData()
+  }, [fetchData])
 
   // ── Source de données selon le segment ────────────────────────────────────
   const allContacts    = data?.contacts ?? []
@@ -247,7 +250,7 @@ export default function TopCliqueurs() {
         {SEGMENTS.map(({ value, label, count }) => (
           <button
             key={value}
-            onClick={() => { setSegment(value); setThemeFilter('') }}
+            onClick={() => { setSegment(value); setThemeFilter(''); setPage(0) }}
             className={`px-3 py-1.5 text-xs font-medium rounded-[4px] border transition-colors cursor-pointer ${
               segment === value
                 ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
@@ -270,7 +273,7 @@ export default function TopCliqueurs() {
           <div className="relative">
             <select
               value={themeFilter}
-              onChange={(e) => setThemeFilter(e.target.value)}
+              onChange={(e) => { setThemeFilter(e.target.value); setPage(0) }}
               className="pl-3 pr-8 py-2 text-xs text-[#0a0a0a] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] transition-all appearance-none cursor-pointer"
             >
               <option value="">Toutes les thématiques</option>
@@ -307,7 +310,7 @@ export default function TopCliqueurs() {
               </button>
               <button
                 type="button"
-                onClick={() => setThemeFilter('')}
+                onClick={() => { setThemeFilter(''); setPage(0) }}
                 className="text-xs text-[#a3a3a3] hover:text-[#0a0a0a] transition-colors cursor-pointer"
               >
                 Effacer
@@ -328,7 +331,7 @@ export default function TopCliqueurs() {
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(0) }}
           placeholder="Rechercher un contact…"
           className="w-full pl-9 pr-4 py-2.5 text-sm text-[#0a0a0a] placeholder-[#a3a3a3] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all duration-150"
         />
@@ -495,7 +498,7 @@ export default function TopCliqueurs() {
                 {PAGE_SIZE_OPTIONS.map((size) => (
                   <button
                     key={size}
-                    onClick={() => setPageSize(size)}
+                    onClick={() => { setPageSize(size); setPage(0) }}
                     className={`px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
                       pageSize === size
                         ? 'bg-[#0a0a0a] text-white'

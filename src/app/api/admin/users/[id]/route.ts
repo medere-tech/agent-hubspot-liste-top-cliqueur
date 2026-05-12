@@ -35,7 +35,7 @@ function parsePatchBody(body: unknown): PatchBody | null {
   return result
 }
 
-// ─── PATCH /api/admin/users/[id] — modifie role/is_active/email/full_name ─────
+// ─── PATCH /api/admin/users/[id] - modifie role/is_active/email/full_name ─────
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -103,7 +103,7 @@ export async function PATCH(
     }
   }
 
-  // ── Update auth.users.email AVANT le profil — si échec, on n'a rien cassé ─
+  // ── Update auth.users.email AVANT le profil - si échec, on n'a rien cassé ─
   const emailChanging = patch.email !== undefined && patch.email !== target.email
   if (emailChanging) {
     const { error: authErr } = await supabase.auth.admin.updateUserById(id, {

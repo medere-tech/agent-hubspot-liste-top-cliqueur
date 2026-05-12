@@ -233,6 +233,17 @@ function DpcFilter({
   )
 }
 
+function readInitialUrlParams(): { source: Source; theme: string } {
+  if (typeof window === 'undefined') return { source: 'inscrits', theme: '' }
+  const params = new URLSearchParams(window.location.search)
+  const s = params.get('source')
+  const t = params.get('theme') ?? ''
+  return {
+    source: (s === 'prospects_chauds' || s === 'inscrits' || s === 'non_inscrits' ? s : 'inscrits') as Source,
+    theme: t,
+  }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ListesPage() {
@@ -242,16 +253,23 @@ export default function ListesPage() {
   const [loadingLists, setLoadingLists] = useState(true)
   const [listsError, setListsError] = useState('')
 
+  // Initial state lu depuis l'URL (?source=...&theme=...) — calculé une fois au mount.
+  const [urlInit] = useState(readInitialUrlParams)
+
   // ── Form state ─────────────────────────────────────────────────────────────
-  const [listName, setListName] = useState('')
-  const [source, setSource] = useState<Source>('inscrits')
+  const [listName, setListName] = useState(
+    urlInit.source === 'prospects_chauds' && urlInit.theme ? `Prospects chauds — ${urlInit.theme}` : ''
+  )
+  const [source, setSource] = useState<Source>(urlInit.source)
   const [creating, setCreating] = useState(false)
   const [createResult, setCreateResult] = useState<CreateResult | null>(null)
 
   // ── Inscrits state (Supabase) ──────────────────────────────────────────────
   const [inscritsData, setInscritsData] = useState<ContactItem[] | null>(null)
   const [inscritsThemes, setInscritsThemes] = useState<string[]>([])
-  const [inscritsSelectedTheme, setInscritsSelectedTheme] = useState('')
+  const [inscritsSelectedTheme, setInscritsSelectedTheme] = useState(
+    urlInit.source === 'inscrits' ? urlInit.theme : ''
+  )
   const [inscritsEligibleDpc, setInscritsEligibleDpc] = useState('')
   const [inscritsLoading, setInscritsLoading] = useState(false)
   const [inscritsError, setInscritsError] = useState('')
@@ -259,13 +277,17 @@ export default function ListesPage() {
   // ── Non-inscrits state (Supabase) ──────────────────────────────────────────
   const [nonInscritsData, setNonInscritsData] = useState<ContactItem[] | null>(null)
   const [nonInscritsThemes, setNonInscritsThemes] = useState<string[]>([])
-  const [nonInscritsSelectedTheme, setNonInscritsSelectedTheme] = useState('')
+  const [nonInscritsSelectedTheme, setNonInscritsSelectedTheme] = useState(
+    urlInit.source === 'non_inscrits' ? urlInit.theme : ''
+  )
   const [nonInscritsEligibleDpc, setNonInscritsEligibleDpc] = useState('')
   const [nonInscritsLoading, setNonInscritsLoading] = useState(false)
   const [nonInscritsError, setNonInscritsError] = useState('')
 
   // ── Prospects chauds state (Supabase, URL-driven) ──────────────────────────
-  const [prospectsTheme, setProspectsTheme] = useState('')
+  const [prospectsTheme] = useState(
+    urlInit.source === 'prospects_chauds' ? urlInit.theme : ''
+  )
   const [prospectsData, setProspectsData] = useState<ContactItem[] | null>(null)
   const [prospectsLoading, setProspectsLoading] = useState(false)
   const [prospectsError, setProspectsError] = useState('')
@@ -292,35 +314,11 @@ export default function ListesPage() {
     }
   }, [])
 
-  // ── Lire les params URL ────────────────────────────────────────────────────
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    const s = params.get('source')
-    const t = params.get('theme')
-
-    if (s === 'prospects_chauds' && t) {
-      setSource('prospects_chauds')
-      setProspectsTheme(t)
-      setListName(`Prospects chauds — ${t}`)
-      return
-    }
-
-    if (s === 'inscrits' || s === 'non_inscrits') {
-      setSource(s)
-      if (t && s === 'inscrits') setInscritsSelectedTheme(t)
-      if (t && s === 'non_inscrits') setNonInscritsSelectedTheme(t)
-    }
-  }, [])
-
-  useEffect(() => {
+    // Fetch initial au mount — setState après await, pattern standard React.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchExistingLists()
   }, [fetchExistingLists])
-
-  // Reset feedback on source change
-  useEffect(() => {
-    setCreateResult(null)
-  }, [source])
 
   // ── Fetch inscrits ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -566,7 +564,7 @@ export default function ListesPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setSource(value)}
+                  onClick={() => { setSource(value); setCreateResult(null) }}
                   className={`px-3 py-2 text-xs font-medium rounded-[4px] border transition-colors cursor-pointer ${
                     source === value
                       ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
