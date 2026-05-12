@@ -33,7 +33,7 @@ function checkRateLimit(ip: string): boolean {
   return true
 }
 
-export default auth(async function middleware(req: NextRequest) {
+export default auth(async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
   const session = (req as NextRequest & { auth?: Session | null }).auth ?? null
 
