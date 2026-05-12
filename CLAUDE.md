@@ -70,7 +70,7 @@ src/
     sidebar.tsx                   # Navigation latérale (lien Admin conditionnel)
   types/
     next-auth.d.ts                # Augmentation User/Session/JWT (role + name)
-  middleware.ts                   # Protection des routes (session + guard admin)
+  proxy.ts                        # Protection des routes (session + guard admin) — renommé depuis middleware.ts (Next.js 16)
 vercel.json                       # Config cron Vercel
 ```
 
@@ -233,6 +233,8 @@ Les emails HubSpot suivent ce pattern :
 | Changement mot de passe self-service | `app/api/profile/password/`, `app/dashboard/profile/` |
 | Augmentation types NextAuth (role + name) | `types/next-auth.d.ts` |
 | Filtre éligibilité DPC (sync + routes + UI + export) | `lib/hubspot.ts`, `lib/sync.ts`, `app/api/contacts/*`, `app/dashboard/listes/`, `app/dashboard/export/` |
+| Migration `proxy.ts` (Next.js 16 — `middleware.ts` deprecated) | `src/proxy.ts` |
+| ESLint 0 erreur 0 warning (Pattern A : `eslint-disable` sur fetch-then-setState, Pattern B : `setPage`/`setCreateResult` dans handlers, Pattern C : lazy initializers + `key` sur modale) | `app/dashboard/*`, `app/api/hubspot/*` |
 
 ### Post-MVP (ne pas implémenter maintenant)
 
@@ -430,8 +432,6 @@ Les ~10 000 contacts existants gardent `eligible_dpc = NULL` jusqu'à leur passa
 ## TODO restants
 
 - **Phase C alias map** : affiner `THEME_ALIASES` avec Arnaud après un cycle complet de sync (identifier les variantes vues en prod qui ne sont pas encore mappées)
-- **Migrer `middleware.ts` → `proxy.ts`** : convention deprecated en Next.js 16 (warning au build)
-- **Corriger les erreurs ESLint** : refactor des `useEffect` problématiques
 - **Réparer WSL2** (env dev local)
 - **Migrer Top cliqueurs sur Supabase** : clarifier le besoin avec Arnaud (aujourd'hui live HubSpot, lifetime clicks)
 - **« Version New Gen… » dans `normalizeTheme`** : la regex `^(?:Primo\s+inscrits|Version\s+\w+)\s*[-:]\s*` exige `-` ou `:` après le préfixe Version + 1 mot. Trop strict pour « Version New Gen CV - CD - … ». **Partiellement résolu via GARBAGE_PATTERNS** (`/^Version\s/i` filtre maintenant), mais une amélioration du strip serait plus propre
