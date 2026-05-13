@@ -130,6 +130,8 @@ export async function getContactClickThemes(email: string): Promise<ContactClick
     if (!name) continue
 
     const { theme, kind } = parseEmailName(name)
+    // [DEBUG-TEMPORAIRE] À retirer une fois la cause "HTA"/"Perturbateur endo" identifiée.
+    console.log('[sync-debug]', JSON.stringify({ email, campaignId, rawName: name, parsedTheme: theme, kind }))
     if (!theme || theme === 'Sans thème' || theme === 'Newsletter') continue
     if (kind === 'commercial' || kind === 'webinaire') continue
 

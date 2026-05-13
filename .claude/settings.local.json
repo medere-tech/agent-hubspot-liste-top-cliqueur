@@ -8,7 +8,8 @@
       "mcp__claude_ai_Supabase__execute_sql",
       "mcp__claude_ai_HubSpot__search_properties",
       "mcp__claude_ai_HubSpot__get_properties",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(npx tsx *)"
     ]
   }
 }

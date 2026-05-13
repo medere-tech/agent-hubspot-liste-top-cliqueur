@@ -192,6 +192,12 @@ const COMMERCIAL_PATTERNS: RegExp[] = [
   /^dangers$/i,
   // Rappels marketing (J-2, J-8, J-23…) — pas des formations
   /^Rappel\s+J[+-]?\d+/i,
+  // Promo app / lead magnets / one-off / opérationnel / événements internes
+  /app\s*mobile/i,
+  /\bebook\b/i,
+  /^demande\s+de\s+paiement/i,
+  /envoi\s+sp[ée]cial/i,
+  /\bSAMA\b/i,
 ]
 
 function isCommercial(rawName: string): boolean {
@@ -223,6 +229,13 @@ const GARBAGE_PATTERNS: RegExp[] = [
   // Marketing commercial qui slip à travers isCommercial
   /^Quizz?\s/i,
   /^Dangers$/i,
+  // Communications internes / opérationnel — pas des thèmes DPC
+  /^Com\s+d[ée]di[ée]e/i,
+  /^Top\s+\d+/i,
+  /^Mail\s+/i,
+  /^App\s+mobile/i,
+  /^Linda\s/i,
+  /^\d{3}$/i,
 ]
 
 /**
@@ -307,15 +320,22 @@ const THEME_ALIASES: Record<string, string> = {
   'implantologie':                  'Implantologie',
   'inlays':                         'Inlays / Onlays',
   'onlays':                         'Inlays / Onlays',
+  'inlay onlay':                    'Inlays / Onlays',
   'inlays / onlays':                'Inlays / Onlays',
   'inlays / onlays / overlays':     'Inlays / Onlays',
   'bruxisme':                       'Bruxismes',
   'bruxismes':                      'Bruxismes',
   'maladies parodontales':          'Maladies parodontales',
   'prothèses amovibles complètes':  'Prothèses Amovibles Complètes',
+  'dermato buccale':                'Dermatologie buccale',
   'dermatologie buccale':           'Dermatologie buccale',
   'retraitement endodontique':      'Endodontie',
+  'tp endodontie':                  'Endodontie',
   'endodontie':                     'Endodontie',
+  'traumato dentaire':              'Traumatologie dentaire',
+  'traumato. dentaire':             'Traumatologie dentaire',
+  'rehabilitation implantaire':     'Réhabilitation implantaire',
+  'réhabilitation implantaire':     'Réhabilitation implantaire',
 
   // Métier
   'téléconsultation':               'Téléconsultation',
@@ -327,6 +347,15 @@ const THEME_ALIASES: Record<string, string> = {
   'bilan de plaie':                 'Bilan de plaies',
   'bilan de plaies':                'Bilan de plaies',
   'bilan de soins infirmiers':      'Bilan de soins infirmiers',
+
+  // Pédiatrie
+  'croissance du petit enfant':     'Croissance',
+  'violence faites aux enfants':    'Violences faites aux enfants',
+  'anciens grands prema':           'Anciens grands prématurés',
+
+  // Gynécologie
+  'suivi gynecologique':            'Suivi gynécologique',
+  'gynecologique':                  'Gynécologie',
 }
 
 /**
@@ -353,9 +382,14 @@ export function normalizeTheme(raw: string): string {
 
   // ── Strip suffixes ──────────────────────────────────────────────────────
   s = s.replace(/\(\s*\d+\s*[eè](?:me|re|r)?\s+envoi[^)]*\)/gi, '')
+  // "envoi spécial …" non couvert par la regex Nème envoi
+  s = s.replace(/\(\s*envoi\s+sp[ée]cial[^)]*\)/gi, '')
   s = s.replace(/\(\s*[Cc]loner?\s*\)/g, '')
   s = s.replace(/\(\s*[Cc]op(?:y|ie)\s*\)/g, '')
   s = s.replace(/\(\s*[Vv]ariation\s*\)/g, '')
+  // Nom propre d'expert entre parenthèses, optionnellement suivi d'une date :
+  // "(Fedida)" ou "(Fedida - 032026)". Capital + lettres minuscules accentuées.
+  s = s.replace(/\(\s*[A-Z][a-zéèêëàâùû]+(?:\s*[-–—]\s*\d{4,6})?\s*\)/g, '')
   s = s.replace(/\b[Rr]elance\s*$/, '')
   s = s.replace(/\(\s*$/, '')          // parenthèse orpheline en fin
   s = s.replace(/\s*[-—]\s*$/, '')     // tiret orphelin en fin
