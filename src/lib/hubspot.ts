@@ -120,15 +120,9 @@ interface HubSpotV1CampaignDetail {
 
 const HUBSPOT_BASE_URL = 'https://api.hubapi.com'
 
-interface FetchOptions {
-  /** Next.js ISR revalidation in seconds. Omit for no-store. */
-  revalidate?: number
-}
-
 async function hubspotFetch<T>(
   path: string,
-  params: Record<string, string> = {},
-  options: FetchOptions = {}
+  params: Record<string, string> = {}
 ): Promise<T> {
   const token = process.env.HUBSPOT_ACCESS_TOKEN
   if (!token) throw new Error('HUBSPOT_ACCESS_TOKEN is not set')
@@ -138,17 +132,15 @@ async function hubspotFetch<T>(
     url.searchParams.set(key, value)
   }
 
-  const nextOptions =
-    options.revalidate !== undefined
-      ? { next: { revalidate: options.revalidate } }
-      : { cache: 'no-store' as const }
-
+  // no-store — le Next.js Data Cache survit aux déploiements. Les routes API
+  // dashboard ont leur propre couche `unstable_cache` (60-300s) suffisante pour
+  // amortir la charge — fresh data à chaque requête côté HubSpot.
   const res = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    ...nextOptions,
+    cache: 'no-store',
   })
 
   if (!res.ok) {
@@ -614,8 +606,7 @@ export async function getCampaigns(days: 7 | 28 | 90 | 360): Promise<Campaign[]>
 
     const page = await hubspotFetch<HubSpotListResponse<HubSpotCampaignRaw>>(
       '/marketing/v3/campaigns',
-      params,
-      { revalidate: 300 }
+      params
     )
 
     allRaw.push(...page.results)
@@ -680,8 +671,7 @@ export async function getMarketingEmails(
 
     const page = await hubspotFetch<HubSpotV1CampaignListResponse>(
       '/email/public/v1/campaigns',
-      params,
-      { revalidate: 300 }
+      params
     )
 
     for (const c of page.campaigns) {
@@ -705,8 +695,7 @@ export async function getMarketingEmails(
       batch.map((id) =>
         hubspotFetch<HubSpotV1CampaignDetail>(
           `/email/public/v1/campaigns/${id}`,
-          {},
-          { revalidate: 300 }
+          {}
         ).catch(() => null)
       )
     )
@@ -868,7 +857,9 @@ export async function getTopClickers(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-      next: { revalidate: 300 },
+      // no-store — le Next.js Data Cache survit aux déploiements et causait des
+      // bugs de stale data sur le cron. Le cron tourne 1×/jour, le cache n'apporte rien.
+      cache: 'no-store',
     })
 
     if (!res.ok) {
