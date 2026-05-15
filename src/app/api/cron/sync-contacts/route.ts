@@ -16,7 +16,6 @@ export async function GET(req: NextRequest) {
   const logs: string[] = []
 
   try {
-    console.log('[cron] Build version:', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local')
     const result = await syncAllTopClickers((msg) => {
       logs.push(msg)
       console.log(msg)
