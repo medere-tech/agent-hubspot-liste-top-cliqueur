@@ -32,7 +32,7 @@ src/
   app/
     api/
       auth/[...nextauth]/         # Auth NextAuth
-      cron/sync-contacts/         # Cron Vercel — sync paginée 1x/jour à 1h UTC
+      cron/sync-contacts/         # Cron Vercel — sync paginée 1x/jour (`export const dynamic = 'force-dynamic'` + log `VERCEL_GIT_COMMIT_SHA`)
       admin/
         users/                    # GET liste / POST création
         users/[id]/               # PATCH update (role, is_active, email, full_name)
@@ -251,17 +251,18 @@ Les emails HubSpot suivent ce pattern :
 Appelé en sortie de chaque branche de `parseEmailName`. Ordre des opérations :
 
 1. **Strip préfixes** : dates `\d{4,8}[\s_]+`, `Suivi`, DPC `(EL|CV|PRES)[/\s-]+(MG|CD|MK|SF|PSY|PED|GYN|PLURIPRO)?[\s-]*`, RM RAPPEL (→ early return `''`), RM SYNTHESE, `RM\d+\s*-`, `RM\d+\s*$` (orphelin), `Primo inscrits`, `Version \w+\s*[-:]`.
-2. **Strip suffixes** : `(Nème envoi)`, `(Cloner)`, `(Copy)`, `(Variation)`, `Relance` final, parenthèses orphelines, tirets orphelins.
+2. **Strip suffixes** : `(Nème envoi)`, `(Cloner)`, `(Copy)`, `(Variation)`, nom expert `(Fedida - 032026)`, `(envoi spécial ...)`, `Relance` final, parenthèses orphelines, tirets orphelins.
 3. **Normalisation finale** : collapse whitespace, trim, capitalize première lettre.
-4. **`GARBAGE_PATTERNS` (pre-alias)** : filet de sûreté si le strip a raté. Matche `^Rappel J\d+`, `^\d+ formations?`, `^\(\d+ formations?\)`, `^CV\s*-`, `^PRES\s*-`, `^EL\s*-`, `^Version\s`, `^Quizz?\s`, `^Dangers$`. Si match → `return ''`.
-5. **`THEME_ALIASES` lookup** (54 entrées) : dédoublonne les variantes connues (`HTA` → `Hypertension artérielle`, `Sommeil` → `Troubles du sommeil`, `Perturbateur endo` → `Perturbateurs endocriniens`, etc.).
+4. **`GARBAGE_PATTERNS` (pre-alias)** — **21 patterns**, filet de sûreté si le strip a raté. Matche `^Rappel J\d+`, `^\d+ formations?`, `^\(\d+ formations?\)`, `^CV\s*-`, `^PRES\s*-`, `^EL\s*-`, `^Version\s`, `^Quizz?\s`, `^Dangers$`, `^Com dédiée`, `^Top \d+`, `^Mail \d+`, `^App mobile`, `^Linda`, codes 3 chiffres, etc. Si match → `return ''`.
+5. **`THEME_ALIASES` lookup** — **72 entrées**. Dédoublonne les variantes connues (`HTA` → `Hypertension artérielle`, `Sommeil` → `Troubles du sommeil`, `Perturbateur endo` → `Perturbateurs endocriniens`, `tp endodontie`, `traumato dentaire`, `dermato buccale`, `inlay onlay`, `réhabilitation implantaire`, `croissance du petit enfant`, `violence faites aux enfants`, `anciens grands prema`, `suivi gynecologique`, `gynecologique`, etc.).
 
 ### `isCommercial` — exclusion au niveau campagne
 
-Matche le **rawName** complet (ancré `^` ou pas selon le pattern). Si une de ces regex match, `parseEmailName` retourne `kind: 'commercial'` :
+Matche le **rawName** complet (ancré `^` ou pas selon le pattern) — **24 patterns**. Si une de ces regex match, `parseEmailName` retourne `kind: 'commercial'` :
 - `black friday`, `flash sales?`, `saint.?valentin`, `\boffre\b`, `fin d'année`, `budget`, `confirmation`, `ouverture budget`
 - `livre blanc`, `^quizz?\s`, `^\d+\s+formations?`, `^\(\d+\s+formations?\)`, `^dangers$`
 - `^Rappel\s+J[+-]?\d+` (J-2, J-8, J-23)
+- `app mobile`, `ebook`, `demande de paiement`, `envoi spécial`, `SAMA`
 
 ### `kind` retourné par `parseEmailName`
 
@@ -420,6 +421,21 @@ Les ~10 000 contacts existants gardent `eligible_dpc = NULL` jusqu'à leur passa
 | Second client `createSupabaseAdmin()` après `signInWithPassword` dans `auth.ts` | Le premier client devient tainté (contexte auth bascule sur le JWT user) → SELECT user_profiles bloqué par RLS |
 | GARBAGE_PATTERNS placés **pre-alias** dans `normalizeTheme` | Si le strip de préfixes a fait son job, la chaîne est déjà clean — GARBAGE ne fire pas inutilement. Sinon il rattrape les résidus (`CV - `, `Version `, etc.) |
 
+## Bug investigation en cours
+
+**Symptôme** : le cron automatique Vercel (1h UTC) produit des thèmes **sales** (`HTA`, `Perturbateur endo`, etc.) alors qu'un déclenchement manuel (curl) sur la **même** route produit des thèmes **propres** (alias appliqués, GARBAGE filtré).
+
+**Diagnostic** : code vérifié OK — les logs `[sync-debug]` temporaires dans `sync.ts` montrent que tous les `parsedTheme` sont corrects en run manuel. Le problème est côté plateforme : Vercel cache la réponse de la route ou utilise un déploiement obsolète pour le cron.
+
+**Fixes appliqués** :
+- `src/app/api/cron/sync-contacts/route.ts` : ajout `export const dynamic = 'force-dynamic'` (recommandé par la KB Vercel pour les cron jobs : https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs)
+- Tous les fetch HubSpot (`lib/hubspot.ts`) : `cache: 'no-store'` à la place de `next: { revalidate: 300 }` — supprime le cache persistant qui pouvait servir des données dépassées au cron
+- `src/app/api/cron/sync-contacts/route.ts` : log `console.log('[cron] Build version:', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local')` au début de GET — permet de tracer dans les logs Vercel quel déploiement le cron utilise
+- `vercel.json` : cron temporairement déplacé à `0 10 * * *` (12h Paris) au lieu de `0 1 * * *` pour observer un run en heure ouvrée — **À REMETTRE à `0 1 * * *` après résolution**
+- Logs `[sync-debug]` temporaires conservés dans `sync.ts` — **À RETIRER après résolution**
+
+**À surveiller** : le prochain run automatique doit afficher le SHA du dernier déploiement et produire des thèmes propres. Si non résolu, suspect suivant : variables d'env divergentes entre runtime cron et runtime curl.
+
 ## Bugs résolus
 
 | Symptôme | Cause | Fix |
@@ -431,6 +447,9 @@ Les ~10 000 contacts existants gardent `eligible_dpc = NULL` jusqu'à leur passa
 
 ## TODO restants
 
+- **Vérifier logs cron automatique** (SHA + thèmes) et confirmer que `force-dynamic` + `cache: 'no-store'` résolvent le problème de thèmes sales (cf. section *Bug investigation en cours*)
+- **Remettre cron à `0 1 * * *`** dans `vercel.json` après résolution du debug
+- **Retirer logs `[sync-debug]` temporaires** de `sync.ts` après résolution
 - **Phase C alias map** : affiner `THEME_ALIASES` avec Arnaud après un cycle complet de sync (identifier les variantes vues en prod qui ne sont pas encore mappées)
 - **Réparer WSL2** (env dev local)
 - **Migrer Top cliqueurs sur Supabase** : clarifier le besoin avec Arnaud (aujourd'hui live HubSpot, lifetime clicks)
