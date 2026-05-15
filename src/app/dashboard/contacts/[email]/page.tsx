@@ -144,7 +144,7 @@ export default function ContactDetailsPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
 
       {/* ── Bouton retour ─────────────────────────────────────────────────── */}
       <button
@@ -172,7 +172,7 @@ export default function ContactDetailsPage() {
       <div className="bg-white border border-[#e5e5e5] rounded-[6px] p-6 mb-6">
 
         {/* En-tête : nom + badge */}
-        <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
           <div className="min-w-0">
             {loading ? (
               <>
@@ -200,7 +200,7 @@ export default function ContactDetailsPage() {
         </div>
 
         {/* 4 metric cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <MetricCard
             label="Clics totaux"
             value={data ? fmtNumber(data.totalClicks) : '-'}
@@ -259,6 +259,7 @@ export default function ContactDetailsPage() {
           </p>
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#f5f5f5]">
@@ -305,6 +306,7 @@ export default function ContactDetailsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

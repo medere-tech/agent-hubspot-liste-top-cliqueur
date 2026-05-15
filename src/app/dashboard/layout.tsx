@@ -15,7 +15,7 @@ export default async function DashboardLayout({
         userName={session?.user?.name}
         userRole={session?.user?.role}
       />
-      <main className="ml-[240px] min-h-screen">
+      <main className="lg:ml-[240px] min-h-screen pt-14 lg:pt-0">
         {children}
       </main>
     </div>

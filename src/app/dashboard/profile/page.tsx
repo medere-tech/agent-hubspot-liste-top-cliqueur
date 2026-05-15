@@ -56,7 +56,7 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-[720px] mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[720px] mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-[#0a0a0a]">Profil</h1>
         <p className="text-sm text-[#737373] mt-1">
@@ -74,9 +74,9 @@ export default async function ProfilePage() {
             <dt className="text-sm text-[#737373]">Nom</dt>
             <dd className="text-sm text-[#0a0a0a]">{profile.full_name}</dd>
           </div>
-          <div className="flex justify-between items-center py-2 border-b border-[#f5f5f5]">
-            <dt className="text-sm text-[#737373]">Email</dt>
-            <dd className="text-sm text-[#0a0a0a]">{profile.email}</dd>
+          <div className="flex justify-between items-center py-2 border-b border-[#f5f5f5] gap-4">
+            <dt className="text-sm text-[#737373] shrink-0">Email</dt>
+            <dd className="text-sm text-[#0a0a0a] break-all text-right">{profile.email}</dd>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-[#f5f5f5]">
             <dt className="text-sm text-[#737373]">Rôle</dt>

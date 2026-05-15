@@ -201,10 +201,10 @@ export default function DashboardPage() {
   const rangeEnd   = Math.min((page + 1) * pageSize, totalRows)
 
   return (
-    <div className="px-8 py-8 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between flex-wrap gap-y-2 mb-8">
         <div>
           <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Tableau de bord</h1>
           <p className="text-sm text-[#737373] mt-0.5">Analyse des campagnes email HubSpot</p>
@@ -239,7 +239,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Metric cards ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <MetricCard label="Total campagnes"    value={campaigns?.count ?? 0} loading={loading} />
         <MetricCard label="Emails envoyés"     value={emails?.count ?? 0}    loading={loading} />
         <MetricCard label="Thématiques"        value={uniqueThemes}           loading={loading} />
@@ -335,6 +335,7 @@ export default function DashboardPage() {
           )}
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#f5f5f5]">
@@ -407,10 +408,11 @@ export default function DashboardPage() {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* ── Pagination ──────────────────────────────────────────────────────── */}
         {!loading && totalRows > 0 && (
-          <div className="px-5 py-3 border-t border-[#e5e5e5] flex items-center justify-between gap-4">
+          <div className="px-5 py-3 border-t border-[#e5e5e5] flex items-center justify-between gap-4 flex-wrap gap-y-2">
 
             {/* ← Précédent */}
             <button

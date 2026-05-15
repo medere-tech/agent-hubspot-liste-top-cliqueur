@@ -174,7 +174,7 @@ export default function ThematiquesPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="px-8 py-8 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="mb-8">
@@ -196,7 +196,7 @@ export default function ThematiquesPage() {
       )}
 
       {/* ── Metric cards ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <MetricCard label="Thématiques"       value={fmtNumber(totals.totalThemes)}      loading={loading} />
         <MetricCard label="Prospects chauds"  value={fmtNumber(totals.totalHot)}         loading={loading} />
         <MetricCard label="Non inscrits"      value={fmtNumber(totals.totalNonInscrits)} loading={loading} />
@@ -231,6 +231,7 @@ export default function ThematiquesPage() {
           )}
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#f5f5f5]">
@@ -330,6 +331,7 @@ export default function ThematiquesPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

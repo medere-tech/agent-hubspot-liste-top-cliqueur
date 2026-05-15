@@ -92,7 +92,7 @@ function PreviewTable({
   return (
     <>
       {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
-      <div className="border border-[#e5e5e5] rounded-[4px] overflow-hidden max-h-[360px] overflow-y-auto">
+      <div className="border border-[#e5e5e5] rounded-[4px] max-h-[360px] overflow-auto">
         <table className="w-full text-sm">
           <thead className="bg-[#fafafa] sticky top-0">
             <tr className="border-b border-[#e5e5e5]">
@@ -132,7 +132,7 @@ function PreviewTable({
                   <td className="px-4 py-2.5">
                     <Link
                       href={`/dashboard/contacts/${encodeURIComponent(p.email)}`}
-                      className="text-[#0a0a0a] hover:underline cursor-pointer"
+                      className="block truncate max-w-[180px] sm:max-w-none text-[#0a0a0a] hover:underline cursor-pointer"
                     >
                       {p.email}
                     </Link>
@@ -510,7 +510,7 @@ export default function ListesPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="px-8 py-8 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
 
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Listes HubSpot</h1>
@@ -748,7 +748,7 @@ export default function ListesPage() {
       {/* ── SECTION B — Listes existantes ───────────────────────────────────── */}
       <div className="bg-white border border-[#e5e5e5] rounded-[6px]">
 
-        <div className="px-6 py-4 border-b border-[#e5e5e5] flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-[#e5e5e5] flex items-center justify-between flex-wrap gap-y-2">
           <div>
             <h2 className="text-sm font-semibold text-[#0a0a0a]">Listes existantes</h2>
             <p className="text-xs text-[#a3a3a3] mt-0.5">50 dernières listes statiques HubSpot</p>
@@ -773,6 +773,7 @@ export default function ListesPage() {
           </div>
         )}
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#f5f5f5]">
@@ -812,7 +813,7 @@ export default function ListesPage() {
                   key={list.listId}
                   className="border-b border-[#f5f5f5] last:border-0 hover:bg-[#fafafa] transition-colors"
                 >
-                  <td className="px-6 py-3.5 font-medium text-[#0a0a0a]">{list.name}</td>
+                  <td className="px-6 py-3.5 font-medium text-[#0a0a0a]"><span className="block truncate max-w-[200px] sm:max-w-none">{list.name}</span></td>
                   <td className="px-6 py-3.5 text-[#737373] tabular-nums">
                     {list.additionalProperties?.hs_list_size != null
                       ? parseInt(list.additionalProperties.hs_list_size, 10).toLocaleString('fr-FR')
@@ -841,6 +842,7 @@ export default function ListesPage() {
             )}
           </tbody>
         </table>
+        </div>
 
       </div>
     </div>

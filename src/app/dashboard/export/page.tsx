@@ -379,7 +379,7 @@ export default function ExportPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Export</h1>
         <p className="text-sm text-[#737373] mt-0.5">

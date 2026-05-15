@@ -502,8 +502,8 @@ export default function AdminUsersPage() {
   }, [refresh])
 
   return (
-    <div className="px-8 py-8 max-w-[1200px] mx-auto">
-      <div className="flex items-start justify-between mb-2">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
+      <div className="flex items-start justify-between flex-wrap gap-y-2 mb-2">
         <div>
           <h1 className="text-2xl font-semibold text-[#0a0a0a]">Utilisateurs</h1>
           <p className="text-sm text-[#737373] mt-1">
@@ -529,6 +529,7 @@ export default function AdminUsersPage() {
       {error && <div className="mb-4"><ErrorBanner message={error} /></div>}
 
       <div className="border border-[#e5e5e5] rounded-[4px] overflow-hidden bg-white">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-[#fafafa]">
             <tr className="border-b border-[#e5e5e5]">
@@ -592,6 +593,7 @@ export default function AdminUsersPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <CreateUserModal

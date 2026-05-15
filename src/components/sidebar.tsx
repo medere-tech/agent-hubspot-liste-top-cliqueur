@@ -3,6 +3,7 @@
 import { signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 interface NavItem {
   label: string
@@ -93,10 +94,11 @@ function isItemActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href)
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
   return (
     <Link
       href={item.href}
+      onClick={onClick}
       className={`flex items-center gap-2.5 px-3 py-2 rounded-[4px] text-sm transition-colors ${
         active
           ? 'bg-[#f5f5f5] text-[#0a0a0a] font-medium'
@@ -111,6 +113,8 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 export default function Sidebar({ userEmail, userName, userRole }: SidebarProps) {
   const pathname = usePathname()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const closeSidebar = () => setSidebarOpen(false)
 
   // Préfère le full_name explicite. Fallback : dérivé de l'email.
   const displayName =
@@ -122,7 +126,33 @@ export default function Sidebar({ userEmail, userName, userRole }: SidebarProps)
   const isProfileActive = pathname.startsWith('/dashboard/profile')
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[240px] bg-white border-r border-[#e5e5e5] flex flex-col z-20">
+    <>
+      {/* Burger — mobile only */}
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Ouvrir le menu"
+        className="lg:hidden fixed top-3 left-3 z-30 flex items-center justify-center w-9 h-9 bg-white border border-[#e5e5e5] rounded-[4px] text-[#0a0a0a] hover:bg-[#f5f5f5] transition-colors"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {/* Backdrop — mobile only, visible quand sidebar ouverte */}
+      {sidebarOpen && (
+        <div
+          onClick={closeSidebar}
+          aria-hidden="true"
+          className="lg:hidden fixed inset-0 z-30 bg-black/40"
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-screen w-[240px] bg-white border-r border-[#e5e5e5] flex flex-col z-40 transition-transform duration-200 lg:translate-x-0 lg:z-20 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
 
       {/* Logo */}
       <div className="px-5 pt-6 pb-5 border-b border-[#e5e5e5]">
@@ -137,7 +167,7 @@ export default function Sidebar({ userEmail, userName, userRole }: SidebarProps)
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => (
-          <NavLink key={item.href} item={item} active={isItemActive(pathname, item.href)} />
+          <NavLink key={item.href} item={item} active={isItemActive(pathname, item.href)} onClick={closeSidebar} />
         ))}
 
         {/* Section Administration — visible uniquement pour les admins */}
@@ -149,7 +179,7 @@ export default function Sidebar({ userEmail, userName, userRole }: SidebarProps)
               </span>
             </div>
             {ADMIN_ITEMS.map((item) => (
-              <NavLink key={item.href} item={item} active={isItemActive(pathname, item.href)} />
+              <NavLink key={item.href} item={item} active={isItemActive(pathname, item.href)} onClick={closeSidebar} />
             ))}
           </>
         )}
@@ -159,6 +189,7 @@ export default function Sidebar({ userEmail, userName, userRole }: SidebarProps)
       <div className="px-3 pb-4 pt-3 border-t border-[#e5e5e5] space-y-0.5">
         <Link
           href="/dashboard/profile"
+          onClick={closeSidebar}
           className={`flex items-center gap-2.5 px-3 py-2 rounded-[4px] transition-colors ${
             isProfileActive
               ? 'bg-[#f5f5f5]'
@@ -180,7 +211,7 @@ export default function Sidebar({ userEmail, userName, userRole }: SidebarProps)
         </Link>
 
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => { closeSidebar(); signOut({ callbackUrl: '/login' }) }}
           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-[4px] text-sm text-[#737373] hover:bg-[#f5f5f5] hover:text-[#0a0a0a] transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -191,6 +222,7 @@ export default function Sidebar({ userEmail, userName, userRole }: SidebarProps)
         </button>
       </div>
 
-    </aside>
+      </aside>
+    </>
   )
 }

@@ -205,10 +205,10 @@ export default function TopCliqueurs() {
     segment === 'non_inscrits' ? 'non inscrits' : 'inscrits'
 
   return (
-    <div className="px-8 py-8 max-w-[1200px]">
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-[1200px] mx-auto">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between flex-wrap gap-y-2 mb-2">
         <div>
           <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Top cliqueurs HubSpot (lifetime)</h1>
           <p className="text-sm text-[#737373] mt-0.5">Croisement HubSpot × Airtable - top 100 contacts. Vue brute HubSpot - pour les contacts qualifiés par thème, voir Thématiques et Listes.</p>
@@ -246,7 +246,7 @@ export default function TopCliqueurs() {
       )}
 
       {/* ── Segment toggle ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 mb-4">
+      <div className="flex items-center gap-1 flex-wrap gap-y-2 mb-4">
         {SEGMENTS.map(({ value, label, count }) => (
           <button
             key={value}
@@ -354,6 +354,7 @@ export default function TopCliqueurs() {
           )}
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#f5f5f5]">
@@ -399,7 +400,7 @@ export default function TopCliqueurs() {
                     <td className="px-5 py-3.5 font-medium">
                       <Link
                         href={`/dashboard/contacts/${encodeURIComponent(c.emailAddress)}`}
-                        className="text-[#0a0a0a] hover:underline cursor-pointer"
+                        className="block truncate max-w-[180px] sm:max-w-none text-[#0a0a0a] hover:underline cursor-pointer"
                       >
                         {c.emailAddress}
                       </Link>
@@ -472,10 +473,11 @@ export default function TopCliqueurs() {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* ── Pagination ──────────────────────────────────────────────────────── */}
         {!loading && totalRows > 0 && (
-          <div className="px-5 py-3 border-t border-[#e5e5e5] flex items-center justify-between gap-4">
+          <div className="px-5 py-3 border-t border-[#e5e5e5] flex items-center justify-between gap-4 flex-wrap gap-y-2">
 
             <button
               onClick={() => setPage((p) => p - 1)}
