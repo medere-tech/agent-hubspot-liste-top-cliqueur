@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { syncAllTopClickers } from '@/lib/sync'
 
 export const maxDuration = 300 // 5 min Vercel max for Pro plan
+export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
   const logs: string[] = []
 
   try {
+    console.log('[cron] Build version:', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local')
     const result = await syncAllTopClickers((msg) => {
       logs.push(msg)
       console.log(msg)
