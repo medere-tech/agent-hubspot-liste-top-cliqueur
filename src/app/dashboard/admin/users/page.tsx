@@ -203,8 +203,8 @@ function CreateUserModal({
               disabled={submitting}
               className="w-full px-3 py-2.5 border border-[#e5e5e5] bg-white text-sm text-[#0a0a0a] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] disabled:opacity-50"
             >
-              <option value="user">User — accès dashboard</option>
-              <option value="admin">Admin — accès total</option>
+              <option value="user">User - accès dashboard</option>
+              <option value="admin">Admin - accès total</option>
             </select>
           </div>
           <div>
@@ -418,7 +418,7 @@ function EditUserModal({
         <div className="mt-6 pt-5 border-t border-[#e5e5e5]">
           <h3 className="text-sm font-medium text-[#0a0a0a] mb-1">Réinitialiser le mot de passe</h3>
           <p className="text-xs text-[#737373] mb-3">
-            Le nouveau mot de passe est défini ici. Transmets-le à l&apos;utilisateur — l&apos;ancien sera révoqué.
+            Le nouveau mot de passe est défini ici. Transmets-le à l&apos;utilisateur - l&apos;ancien sera révoqué.
           </p>
           <div className="flex gap-2">
             <input
@@ -507,7 +507,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-[#0a0a0a]">Utilisateurs</h1>
           <p className="text-sm text-[#737373] mt-1">
-            Gérer les accès à l&apos;application — création, rôles, désactivation.
+            Gérer les accès à l&apos;application - création, rôles, désactivation.
           </p>
         </div>
         <button
@@ -567,7 +567,7 @@ export default function AdminUsersPage() {
             ) : users.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#a3a3a3]">
-                  Aucun utilisateur — créez le premier compte ci-dessus.
+                  Aucun utilisateur - créez le premier compte ci-dessus.
                 </td>
               </tr>
             ) : (

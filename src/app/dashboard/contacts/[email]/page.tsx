@@ -40,12 +40,12 @@ function fmtNumber(n: number): string {
 }
 
 function fmtRate(r: number | null): string {
-  if (r === null) return '—'
+  if (r === null) return '-'
   return r.toFixed(1) + ' %'
 }
 
 function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Intl.DateTimeFormat('fr-FR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   }).format(new Date(iso))
@@ -203,22 +203,22 @@ export default function ContactDetailsPage() {
         <div className="grid grid-cols-4 gap-4 mb-6">
           <MetricCard
             label="Clics totaux"
-            value={data ? fmtNumber(data.totalClicks) : '—'}
+            value={data ? fmtNumber(data.totalClicks) : '-'}
             loading={loading}
           />
           <MetricCard
             label="Ouvertures totales"
-            value={data ? fmtNumber(data.totalOpens) : '—'}
+            value={data ? fmtNumber(data.totalOpens) : '-'}
             loading={loading}
           />
           <MetricCard
             label="Emails reçus"
-            value={data ? fmtNumber(data.totalDelivered) : '—'}
+            value={data ? fmtNumber(data.totalDelivered) : '-'}
             loading={loading}
           />
           <MetricCard
             label="Taux d'ouverture"
-            value={data ? fmtRate(data.openRate) : '—'}
+            value={data ? fmtRate(data.openRate) : '-'}
             loading={loading}
           />
         </div>
@@ -237,10 +237,10 @@ export default function ContactDetailsPage() {
                 >
                   <span className="font-medium text-[#0a0a0a]">{ins.nomFormation}</span>
                   {ins.specialite && (
-                    <span className="text-xs text-[#737373]">— {ins.specialite}</span>
+                    <span className="text-xs text-[#737373]">- {ins.specialite}</span>
                   )}
                   {ins.dateCreation && (
-                    <span className="text-xs text-[#a3a3a3]">— {fmtDate(ins.dateCreation)}</span>
+                    <span className="text-xs text-[#a3a3a3]">- {fmtDate(ins.dateCreation)}</span>
                   )}
                 </li>
               ))}

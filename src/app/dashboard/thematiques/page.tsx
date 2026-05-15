@@ -180,7 +180,7 @@ export default function ThematiquesPage() {
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Thématiques</h1>
         <p className="text-sm text-[#737373] mt-0.5">
-          Vue agrégée par thème — segmentation prospects vs inscrits
+          Vue agrégée par thème - segmentation prospects vs inscrits
         </p>
       </div>
 
@@ -269,7 +269,7 @@ export default function ThematiquesPage() {
                 <td colSpan={COLUMNS.length} className="px-5 py-10 text-center text-sm text-[#a3a3a3]">
                   {search.trim()
                     ? 'Aucun résultat pour cette recherche.'
-                    : 'Aucune donnée — la sync Supabase n\'a pas encore tourné.'}
+                    : 'Aucune donnée - la sync Supabase n\'a pas encore tourné.'}
                 </td>
               </tr>
             ) : (

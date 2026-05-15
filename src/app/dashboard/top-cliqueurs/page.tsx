@@ -36,7 +36,7 @@ function fmtNumber(n: number): string {
 }
 
 function fmtRate(rate: number | null): string {
-  if (rate === null) return '—'
+  if (rate === null) return '-'
   return rate.toFixed(1) + '\u202f%'
 }
 
@@ -211,7 +211,7 @@ export default function TopCliqueurs() {
       <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Top cliqueurs HubSpot (lifetime)</h1>
-          <p className="text-sm text-[#737373] mt-0.5">Croisement HubSpot × Airtable — top 100 contacts. Vue brute HubSpot — pour les contacts qualifiés par thème, voir Thématiques et Listes.</p>
+          <p className="text-sm text-[#737373] mt-0.5">Croisement HubSpot × Airtable - top 100 contacts. Vue brute HubSpot - pour les contacts qualifiés par thème, voir Thématiques et Listes.</p>
         </div>
 
         {/* Export CSV */}

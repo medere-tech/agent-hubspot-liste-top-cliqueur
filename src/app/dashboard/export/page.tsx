@@ -383,14 +383,14 @@ export default function ExportPage() {
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-[#0a0a0a] tracking-tight">Export</h1>
         <p className="text-sm text-[#737373] mt-0.5">
-          Export CSV centralisé — données issues de Supabase. Format Excel FR (séparateur point-virgule, BOM UTF-8).
+          Export CSV centralisé - données issues de Supabase. Format Excel FR (séparateur point-virgule, BOM UTF-8).
         </p>
       </div>
 
       <div className="space-y-4">
         <ExportCard
           title="Thématiques"
-          description="Agrégat par thème — contacts uniques, prospects chauds, taux de conversion, clics."
+          description="Agrégat par thème - contacts uniques, prospects chauds, taux de conversion, clics."
           state={thematiquesState}
           onExport={exportThematiques}
           buttonLabel="Exporter les thématiques"
@@ -398,7 +398,7 @@ export default function ExportPage() {
 
         <ExportCard
           title="Contacts non inscrits"
-          description="Contacts non inscrits avec ≥3 clics sur au moins un thème — filtrable par thématique."
+          description="Contacts non inscrits avec ≥3 clics sur au moins un thème - filtrable par thématique."
           state={nonInscritsState}
           onExport={exportNonInscrits}
           buttonLabel="Exporter les non inscrits"
@@ -412,7 +412,7 @@ export default function ExportPage() {
 
         <ExportCard
           title="Contacts inscrits"
-          description="Contacts inscrits avec ≥3 clics sur au moins un thème — filtrable par thématique."
+          description="Contacts inscrits avec ≥3 clics sur au moins un thème - filtrable par thématique."
           state={inscritsState}
           onExport={exportInscrits}
           buttonLabel="Exporter les inscrits"

@@ -51,7 +51,7 @@ interface ContactsApiResponse {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | undefined): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso))
 }
 
@@ -140,7 +140,7 @@ function PreviewTable({
                   <td className="px-4 py-2.5 text-[#0a0a0a] tabular-nums text-right">{p.clicksOnTheme}</td>
                   <td className="px-4 py-2.5 text-[#737373]">{fmtDate(p.lastClickOnTheme)}</td>
                   <td className="px-4 py-2.5 text-[#737373]">
-                    {p.eligibleDpc === 'true' ? 'Oui' : p.eligibleDpc === 'false' ? 'Non' : '—'}
+                    {p.eligibleDpc === 'true' ? 'Oui' : p.eligibleDpc === 'false' ? 'Non' : '-'}
                   </td>
                 </tr>
               ))
@@ -258,7 +258,7 @@ export default function ListesPage() {
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [listName, setListName] = useState(
-    urlInit.source === 'prospects_chauds' && urlInit.theme ? `Prospects chauds — ${urlInit.theme}` : ''
+    urlInit.source === 'prospects_chauds' && urlInit.theme ? `Prospects chauds - ${urlInit.theme}` : ''
   )
   const [source, setSource] = useState<Source>(urlInit.source)
   const [creating, setCreating] = useState(false)
@@ -541,7 +541,7 @@ export default function ListesPage() {
               type="text"
               value={listName}
               onChange={(e) => setListName(e.target.value)}
-              placeholder="Ex : Top cliqueurs MG — Sommeil 04/2026"
+              placeholder="Ex : Top cliqueurs MG - Sommeil 04/2026"
               className="w-full max-w-[480px] px-3 py-2.5 text-sm text-[#0a0a0a] placeholder-[#a3a3a3] bg-white border border-[#e5e5e5] rounded-[4px] outline-none focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a] transition-all"
             />
           </div>
@@ -639,7 +639,7 @@ export default function ListesPage() {
           {source === 'prospects_chauds' && (
             <div>
               <label className="block text-xs font-medium text-[#0a0a0a] mb-1.5">
-                Aperçu des prospects chauds — {prospectsTheme}
+                Aperçu des prospects chauds - {prospectsTheme}
               </label>
               <PreviewTable
                 data={prospectsData}
@@ -816,7 +816,7 @@ export default function ListesPage() {
                   <td className="px-6 py-3.5 text-[#737373] tabular-nums">
                     {list.additionalProperties?.hs_list_size != null
                       ? parseInt(list.additionalProperties.hs_list_size, 10).toLocaleString('fr-FR')
-                      : '—'}
+                      : '-'}
                   </td>
                   <td className="px-6 py-3.5 text-[#737373]">{fmtDate(list.createdAt)}</td>
                   <td className="px-6 py-3.5 text-right">
@@ -833,7 +833,7 @@ export default function ListesPage() {
                         </svg>
                       </a>
                     ) : (
-                      <span className="text-xs text-[#d4d4d4]">—</span>
+                      <span className="text-xs text-[#d4d4d4]">-</span>
                     )}
                   </td>
                 </tr>

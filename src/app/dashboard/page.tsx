@@ -329,7 +329,7 @@ export default function DashboardPage() {
             <span className="text-xs text-[#a3a3a3]">
               {totalRows} thème{totalRows !== 1 ? 's' : ''}
               {emails?.count === 0 && (
-                <span className="ml-2">— emails non disponibles (scope manquant)</span>
+                <span className="ml-2">- emails non disponibles (scope manquant)</span>
               )}
             </span>
           )}
