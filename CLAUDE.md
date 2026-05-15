@@ -32,7 +32,7 @@ src/
   app/
     api/
       auth/[...nextauth]/         # Auth NextAuth
-      cron/sync-contacts/         # Cron Vercel — sync paginée 1x/jour (`export const dynamic = 'force-dynamic'` + log `VERCEL_GIT_COMMIT_SHA`)
+      cron/sync-contacts/         # Cron Vercel — sync paginée 1x/jour à 1h UTC (`export const dynamic = 'force-dynamic'` obligatoire)
       admin/
         users/                    # GET liste / POST création
         users/[id]/               # PATCH update (role, is_active, email, full_name)
@@ -421,21 +421,6 @@ Les ~10 000 contacts existants gardent `eligible_dpc = NULL` jusqu'à leur passa
 | Second client `createSupabaseAdmin()` après `signInWithPassword` dans `auth.ts` | Le premier client devient tainté (contexte auth bascule sur le JWT user) → SELECT user_profiles bloqué par RLS |
 | GARBAGE_PATTERNS placés **pre-alias** dans `normalizeTheme` | Si le strip de préfixes a fait son job, la chaîne est déjà clean — GARBAGE ne fire pas inutilement. Sinon il rattrape les résidus (`CV - `, `Version `, etc.) |
 
-## Bug investigation en cours
-
-**Symptôme** : le cron automatique Vercel (1h UTC) produit des thèmes **sales** (`HTA`, `Perturbateur endo`, etc.) alors qu'un déclenchement manuel (curl) sur la **même** route produit des thèmes **propres** (alias appliqués, GARBAGE filtré).
-
-**Diagnostic** : code vérifié OK — les logs `[sync-debug]` temporaires dans `sync.ts` montrent que tous les `parsedTheme` sont corrects en run manuel. Le problème est côté plateforme : Vercel cache la réponse de la route ou utilise un déploiement obsolète pour le cron.
-
-**Fixes appliqués** :
-- `src/app/api/cron/sync-contacts/route.ts` : ajout `export const dynamic = 'force-dynamic'` (recommandé par la KB Vercel pour les cron jobs : https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs)
-- Tous les fetch HubSpot (`lib/hubspot.ts`) : `cache: 'no-store'` à la place de `next: { revalidate: 300 }` — supprime le cache persistant qui pouvait servir des données dépassées au cron
-- `src/app/api/cron/sync-contacts/route.ts` : log `console.log('[cron] Build version:', process.env.VERCEL_GIT_COMMIT_SHA ?? 'local')` au début de GET — permet de tracer dans les logs Vercel quel déploiement le cron utilise
-- `vercel.json` : cron temporairement déplacé à `0 10 * * *` (12h Paris) au lieu de `0 1 * * *` pour observer un run en heure ouvrée — **À REMETTRE à `0 1 * * *` après résolution**
-- Logs `[sync-debug]` temporaires conservés dans `sync.ts` — **À RETIRER après résolution**
-
-**À surveiller** : le prochain run automatique doit afficher le SHA du dernier déploiement et produire des thèmes propres. Si non résolu, suspect suivant : variables d'env divergentes entre runtime cron et runtime curl.
-
 ## Bugs résolus
 
 | Symptôme | Cause | Fix |
@@ -444,12 +429,10 @@ Les ~10 000 contacts existants gardent `eligible_dpc = NULL` jusqu'à leur passa
 | Thèmes parasites persistants en base après un deploy qui change le parsing | Sync forward-only : ne retouche que la fenêtre du jour (~150 contacts), les ~9 850 autres gardent leurs vieux thèmes. Et quand le nouveau code épure tout → skip upsert → fossile reste | `sync.ts:305` fait maintenant un `DELETE` quand `themes.length === 0` au lieu de skip. Pour reset complet après un deploy invasif : truncate + reset curseur |
 | « Rappel J-23 », « 3 formations » et autres résidus dans les thèmes même avec `isCommercial` étendu | `isCommercial` est ancré `^` sur le rawName complet → si ces patterns sont en milieu de chaîne (`CV - MG - Rappel J-23 - Sommeil`), pas de match | `GARBAGE_PATTERNS` dans `normalizeTheme` agit sur la chaîne post-strip, attrape les patterns au milieu |
 | PGRST205 — Could not find the table in the schema cache | PostgREST cache le schéma au démarrage. Une table créée sans notification reste invisible | `NOTIFY pgrst, 'reload schema';` dans l'éditeur SQL après création de table |
+| Cron automatique Vercel (1h UTC) produisait des thèmes **sales** (`HTA`, `Perturbateur endo`, etc.) alors qu'un trigger manuel (curl) sur la même route produisait des thèmes **propres** | Route cron sans `export const dynamic = 'force-dynamic'` → Next.js cachait/optimisait la réponse, le cron pouvait servir un déploiement obsolète au lieu du dernier build | Ajout de `export const dynamic = 'force-dynamic'` dans `src/app/api/cron/sync-contacts/route.ts` (recommandé par la KB Vercel : https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs). Le cron utilise maintenant systématiquement le dernier déploiement. Renforcé par `cache: 'no-store'` sur tous les fetch HubSpot dans `lib/hubspot.ts` |
 
 ## TODO restants
 
-- **Vérifier logs cron automatique** (SHA + thèmes) et confirmer que `force-dynamic` + `cache: 'no-store'` résolvent le problème de thèmes sales (cf. section *Bug investigation en cours*)
-- **Remettre cron à `0 1 * * *`** dans `vercel.json` après résolution du debug
-- **Retirer logs `[sync-debug]` temporaires** de `sync.ts` après résolution
 - **Phase C alias map** : affiner `THEME_ALIASES` avec Arnaud après un cycle complet de sync (identifier les variantes vues en prod qui ne sont pas encore mappées)
 - **Réparer WSL2** (env dev local)
 - **Migrer Top cliqueurs sur Supabase** : clarifier le besoin avec Arnaud (aujourd'hui live HubSpot, lifetime clicks)
